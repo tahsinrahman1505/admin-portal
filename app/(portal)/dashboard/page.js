@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { supabase } from '../../lib/supabase'
+import { supabase } from '@/lib/supabase'
 
 export default function DashboardPage() {
   const router = useRouter()
@@ -386,31 +386,13 @@ export default function DashboardPage() {
           </div>
         </div>
       ) : (
-        <div className="dash-root">
+        <div className="flex-1 overflow-auto">
           <div className="bg-orb orb1" />
           <div className="bg-orb orb2" />
 
-          {/* Sidebar */}
-          <aside className="sidebar">
-            <div className="sidebar-brand">
-              <div className="brand-dot" />
-              <span className="brand-name">Dental Portal</span>
-            </div>
-            <div className="nav-label">Menu</div>
-            <a className="nav-item active"><span className="nav-icon">▣</span> Dashboard</a>
-            <a className="nav-item"><span className="nav-icon">💬</span> Conversations</a>
-            <a className="nav-item"><span className="nav-icon">🎯</span> Leads</a>
-            <a className="nav-item"><span className="nav-icon">📅</span> Bookings</a>
-            <a className="nav-item"><span className="nav-icon">⚙️</span> Settings</a>
-            <div className="sidebar-bottom">
-              <button className="logout-btn" onClick={handleLogout}>
-                <span>↩</span> Sign out
-              </button>
-            </div>
-          </aside>
 
           {/* Main */}
-          <main className="main">
+          <div className="main">
             <div className="header">
               <p className="header-greeting">Good morning 👋</p>
               <h1 className="header-title">
@@ -478,7 +460,7 @@ export default function DashboardPage() {
             <div className="timestamp">
               <span>◎</span> Dashboard refreshes automatically on each login
             </div>
-          </main>
+          </div>
         </div>
       )}
     </>

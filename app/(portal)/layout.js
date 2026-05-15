@@ -11,6 +11,7 @@ const NAV = [
   { label: 'Leads',         href: '/leads',         icon: '🎯' },
   { label: 'Bookings',      href: '/bookings',      icon: '📅' },
   { label: 'Settings',      href: '/settings',      icon: '⚙' },
+  { label: 'Knowledge Base', href: '/knowledge-base', icon: '📚' },
 ]
 
 export default function PortalLayout({ children }) {

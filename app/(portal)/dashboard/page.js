@@ -9,6 +9,14 @@ export default function DashboardPage() {
   const [lastUpdated, setLastUpdated] = useState(null)
   const [loading, setLoading] = useState(true)
   const [clientName, setClientName] = useState('')
+  const [botStatus, setBotStatus] = useState(null)
+
+  useEffect(() => {
+    fetch(`${process.env.NEXT_PUBLIC_API_URL}/health`)
+      .then(res => res.json())
+      .then(data => setBotStatus(data.status))
+      .catch(() => setBotStatus('unreachable'))
+  }, [])
 
   useEffect(() => {
     async function init() {
@@ -402,6 +410,23 @@ export default function DashboardPage() {
                 <div className="live-dot" />
                 <span className="live-text">Live data · Last updated {lastUpdated}</span>
               </div>
+              {(() => {
+                const statusColor = {
+                  'ok': 'text-green-400 bg-green-400/10',
+                  'degraded': 'text-amber-400 bg-amber-400/10',
+                  'unreachable': 'text-red-400 bg-red-400/10'
+                }[botStatus] || 'text-gray-400 bg-white/5'
+                const statusLabel = {
+                  'ok': '🟢 Bot Online',
+                  'degraded': '🟡 Degraded',
+                  'unreachable': '🔴 Bot Offline'
+                }[botStatus] || '⚪ Checking...'
+                return (
+                  <div className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium mt-3 ${statusColor}`}>
+                    {statusLabel}
+                  </div>
+                )
+              })()}
             </div>
 
             {/* Metric Cards */}

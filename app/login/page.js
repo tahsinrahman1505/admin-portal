@@ -24,183 +24,77 @@ export default function LoginPage() {
   }
 
   return (
-    <>
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&display=swap');
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { background: #0a0a0f; }
+    <div className="min-h-screen bg-[#080808] flex items-center justify-center px-4 relative overflow-hidden">
+      {/* Ambient glow */}
+      <div className="pointer-events-none absolute inset-0">
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[400px] rounded-full bg-[#00e5b0]/[0.055] blur-[140px]" />
+      </div>
 
-        .login-root {
-          min-height: 100vh;
-          background: #0a0a0f;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          font-family: 'DM Sans', sans-serif;
-          position: relative;
-          overflow: hidden;
-        }
-        .bg-orb {
-          position: absolute;
-          border-radius: 50%;
-          filter: blur(120px);
-          opacity: 0.15;
-          pointer-events: none;
-        }
-        .orb1 { width: 600px; height: 600px; background: #4f6ef7; top: -200px; left: -200px; }
-        .orb2 { width: 400px; height: 400px; background: #7c3aed; bottom: -100px; right: -100px; }
+      <div
+        className="relative z-10 w-full max-w-[400px] bg-white/[0.03] border border-white/[0.08] rounded-2xl p-10 backdrop-blur-sm"
+        style={{ animation: 'fadeUp 0.5s ease both' }}
+      >
+        <style>{`@keyframes fadeUp { from { opacity:0; transform:translateY(20px); } to { opacity:1; transform:translateY(0); } }`}</style>
 
-        .login-card {
-          position: relative;
-          z-index: 10;
-          background: rgba(255,255,255,0.03);
-          border: 1px solid rgba(255,255,255,0.08);
-          border-radius: 24px;
-          padding: 48px;
-          width: 100%;
-          max-width: 420px;
-          backdrop-filter: blur(20px);
-          animation: fadeUp 0.6s ease both;
-        }
-        @keyframes fadeUp {
-          from { opacity: 0; transform: translateY(24px); }
-          to   { opacity: 1; transform: translateY(0); }
-        }
+        {/* Logo */}
+        <div className="flex items-center gap-2.5 mb-9">
+          <div className="w-8 h-8 rounded-lg bg-[#00e5b0]/10 border border-[#00e5b0]/25 flex items-center justify-center shrink-0">
+            <span className="text-[#00e5b0] text-[13px] font-extrabold">T</span>
+          </div>
+          <span className="text-white font-extrabold text-[17px] tracking-tight">
+            Tahsin<span className="text-[#00e5b0]">.</span>ai
+          </span>
+        </div>
 
-        .brand {
-          display: flex;
-          align-items: center;
-          gap: 10px;
-          margin-bottom: 36px;
-        }
-        .brand-dot {
-          width: 10px; height: 10px;
-          background: #4f6ef7;
-          border-radius: 50%;
-          box-shadow: 0 0 12px #4f6ef7;
-        }
-        .brand-name {
-          font-family: 'Syne', sans-serif;
-          font-weight: 700;
-          font-size: 15px;
-          color: rgba(255,255,255,0.5);
-          letter-spacing: 0.1em;
-          text-transform: uppercase;
-        }
+        <h1 className="text-[1.7rem] font-extrabold text-white tracking-tight leading-tight mb-1.5">
+          Welcome back
+        </h1>
+        <p className="text-white/35 text-[13.5px] mb-8">Sign in to your clinic dashboard</p>
 
-        .login-title {
-          font-family: 'Syne', sans-serif;
-          font-size: 32px;
-          font-weight: 800;
-          color: #fff;
-          line-height: 1.1;
-          margin-bottom: 8px;
-        }
-        .login-sub {
-          font-size: 14px;
-          color: rgba(255,255,255,0.35);
-          margin-bottom: 36px;
-        }
-
-        .field { margin-bottom: 16px; }
-        .field label {
-          display: block;
-          font-size: 12px;
-          font-weight: 500;
-          color: rgba(255,255,255,0.4);
-          letter-spacing: 0.08em;
-          text-transform: uppercase;
-          margin-bottom: 8px;
-        }
-        .field input {
-          width: 100%;
-          background: rgba(255,255,255,0.05);
-          border: 1px solid rgba(255,255,255,0.08);
-          border-radius: 12px;
-          padding: 14px 16px;
-          font-size: 14px;
-          color: #fff;
-          font-family: 'DM Sans', sans-serif;
-          outline: none;
-          transition: border-color 0.2s, background 0.2s;
-        }
-        .field input:focus {
-          border-color: #4f6ef7;
-          background: rgba(79,110,247,0.06);
-        }
-        .field input::placeholder { color: rgba(255,255,255,0.2); }
-
-        .error-msg {
-          background: rgba(239,68,68,0.1);
-          border: 1px solid rgba(239,68,68,0.2);
-          border-radius: 10px;
-          padding: 12px 14px;
-          font-size: 13px;
-          color: #f87171;
-          margin-bottom: 16px;
-        }
-
-        .login-btn {
-          width: 100%;
-          background: #4f6ef7;
-          color: #fff;
-          border: none;
-          border-radius: 12px;
-          padding: 15px;
-          font-size: 14px;
-          font-weight: 600;
-          font-family: 'DM Sans', sans-serif;
-          cursor: pointer;
-          transition: background 0.2s, transform 0.1s, box-shadow 0.2s;
-          margin-top: 8px;
-          letter-spacing: 0.02em;
-        }
-        .login-btn:hover { background: #3d5ce6; box-shadow: 0 8px 24px rgba(79,110,247,0.3); }
-        .login-btn:active { transform: scale(0.98); }
-        .login-btn:disabled { opacity: 0.5; cursor: not-allowed; }
-      `}</style>
-
-      <div className="login-root">
-        <div className="bg-orb orb1" />
-        <div className="bg-orb orb2" />
-
-        <div className="login-card">
-          <div className="brand">
-            <div className="brand-dot" />
-            <span className="brand-name">Dental Portal</span>
+        <form onSubmit={handleLogin} className="space-y-4">
+          <div>
+            <label className="block text-[11px] font-semibold text-white/40 uppercase tracking-[0.1em] mb-2">
+              Email
+            </label>
+            <input
+              type="email"
+              value={email}
+              onChange={e => setEmail(e.target.value)}
+              placeholder="you@example.com"
+              required
+              className="w-full bg-white/[0.05] border border-white/[0.08] rounded-xl px-4 py-3 text-[14px] text-white placeholder-white/20 outline-none focus:border-[#00e5b0]/50 focus:bg-[#00e5b0]/[0.04] transition-all duration-200"
+            />
           </div>
 
-          <h1 className="login-title">Welcome back</h1>
-          <p className="login-sub">Sign in to your client dashboard</p>
+          <div>
+            <label className="block text-[11px] font-semibold text-white/40 uppercase tracking-[0.1em] mb-2">
+              Password
+            </label>
+            <input
+              type="password"
+              value={password}
+              onChange={e => setPassword(e.target.value)}
+              placeholder="••••••••"
+              required
+              className="w-full bg-white/[0.05] border border-white/[0.08] rounded-xl px-4 py-3 text-[14px] text-white placeholder-white/20 outline-none focus:border-[#00e5b0]/50 focus:bg-[#00e5b0]/[0.04] transition-all duration-200"
+            />
+          </div>
 
-          <form onSubmit={handleLogin}>
-            <div className="field">
-              <label>Email</label>
-              <input
-                type="email"
-                value={email}
-                onChange={e => setEmail(e.target.value)}
-                placeholder="you@example.com"
-                required
-              />
+          {error && (
+            <div className="bg-red-500/[0.08] border border-red-500/20 rounded-xl px-4 py-3 text-[13px] text-red-400">
+              {error}
             </div>
-            <div className="field">
-              <label>Password</label>
-              <input
-                type="password"
-                value={password}
-                onChange={e => setPassword(e.target.value)}
-                placeholder="••••••••"
-                required
-              />
-            </div>
-            {error && <div className="error-msg">{error}</div>}
-            <button type="submit" className="login-btn" disabled={loading}>
-              {loading ? 'Signing in...' : 'Sign in →'}
-            </button>
-          </form>
-        </div>
+          )}
+
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full mt-2 bg-[#00e5b0] text-[#080808] font-bold py-3.5 rounded-xl text-[14px] hover:brightness-110 active:scale-[0.98] disabled:opacity-50 transition-all duration-150"
+          >
+            {loading ? 'Signing in…' : 'Sign in →'}
+          </button>
+        </form>
       </div>
-    </>
+    </div>
   )
 }

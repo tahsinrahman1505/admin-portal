@@ -5,7 +5,9 @@ import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { ConversationsSkeleton } from '@/components/Skeleton'
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || ''
+const API_URL     = process.env.NEXT_PUBLIC_API_URL || ''
+const API_SECRET  = process.env.NEXT_PUBLIC_RAG_API_SECRET || ''
+const API_HEADERS = { 'Content-Type': 'application/json', 'x-api-key': API_SECRET }
 
 function maskPhone(phone) {
   if (!phone) return 'Unknown'
@@ -240,7 +242,7 @@ export default function ConversationsPage() {
     try {
       const res = await fetch(`${API_URL}/session/resume`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: API_HEADERS,
         body: JSON.stringify({ session_id: normalized, client_id: botClientId || 'dental_demo' })
       })
       if (res.ok) {
@@ -265,7 +267,7 @@ export default function ConversationsPage() {
     try {
       const res = await fetch(`${API_URL}/session/summary`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: API_HEADERS,
         body: JSON.stringify({
           session_id: selected.session_id,
           client_id:  botClientId || 'dental_demo',
@@ -302,7 +304,7 @@ export default function ConversationsPage() {
     try {
       const res = await fetch(`${API_URL}/session/send`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: API_HEADERS,
         body: JSON.stringify({
           session_id: normalizePhone(selected.phone),
           message:    msgText,

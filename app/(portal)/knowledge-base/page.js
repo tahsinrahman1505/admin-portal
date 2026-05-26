@@ -1,8 +1,9 @@
 'use client'
 import { useState, useEffect, useRef } from 'react'
 
-const FASTAPI_URL = process.env.NEXT_PUBLIC_FASTAPI_URL || 'http://127.0.0.1:8000'
-const CLIENT_ID = process.env.NEXT_PUBLIC_CLIENT_ID || 'default'
+const FASTAPI_URL  = process.env.NEXT_PUBLIC_FASTAPI_URL || process.env.NEXT_PUBLIC_API_URL || 'https://n8n.mdtahsinrahman.com/api'
+const CLIENT_ID    = process.env.NEXT_PUBLIC_CLIENT_ID || 'default'
+const API_SECRET   = process.env.NEXT_PUBLIC_RAG_API_SECRET || ''
 
 export default function KnowledgeBasePage() {
   const [documents, setDocuments] = useState([])
@@ -15,7 +16,9 @@ export default function KnowledgeBasePage() {
 
   async function fetchDocuments() {
     try {
-      const res = await fetch(`${FASTAPI_URL}/ingest/list?client_id=${CLIENT_ID}`)
+      const res = await fetch(`${FASTAPI_URL}/ingest/list?client_id=${CLIENT_ID}`, {
+        headers: { 'x-api-key': API_SECRET }
+      })
       const data = await res.json()
       setDocuments(data.documents || [])
     } catch { setDocuments([]) }
@@ -44,7 +47,11 @@ export default function KnowledgeBasePage() {
     formData.append('file', selectedFile)
     formData.append('client_id', CLIENT_ID)
     try {
-      const res = await fetch(`${FASTAPI_URL}/ingest`, { method: 'POST', body: formData })
+      const res = await fetch(`${FASTAPI_URL}/ingest`, {
+        method: 'POST',
+        headers: { 'x-api-key': API_SECRET },
+        body: formData
+      })
       if (!res.ok) throw new Error()
       setSelectedFile(null); await fetchDocuments()
     } catch { setUploadError('Something went wrong — try again.') }
@@ -53,7 +60,10 @@ export default function KnowledgeBasePage() {
 
   async function handleDelete(docId) {
     if (!confirm('Delete this document and all its chunks?')) return
-    await fetch(`${FASTAPI_URL}/ingest/${docId}`, { method: 'DELETE' })
+    await fetch(`${FASTAPI_URL}/ingest/${docId}`, {
+      method: 'DELETE',
+      headers: { 'x-api-key': API_SECRET }
+    })
     setDocuments(prev => prev.filter(d => d.id !== docId))
   }
 

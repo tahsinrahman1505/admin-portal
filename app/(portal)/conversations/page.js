@@ -47,6 +47,8 @@ export default function ConversationsPage() {
   const [resuming, setResuming]       = useState(null)
   const [replyText, setReplyText]     = useState('')
   const [sending, setSending]         = useState(false)
+  const [summary, setSummary]         = useState(null)   // null | string
+  const [summarizing, setSummarizing] = useState(false)
 
   // Messages for the selected thread (live-updated via Realtime)
   const [liveMessages, setLiveMessages] = useState([])
@@ -211,10 +213,11 @@ export default function ConversationsPage() {
     return () => { supabase.removeChannel(channel) }
   }, [portalClientId])
 
-  // ── Switch liveMessages when selected thread changes ──
+  // ── Switch liveMessages + clear summary when selected thread changes ──
   useEffect(() => {
     if (selected) {
       setLiveMessages(selected.messages)
+      setSummary(null)
     }
   }, [selected?.session_id]) // eslint-disable-line
 
@@ -251,6 +254,29 @@ export default function ConversationsPage() {
       console.error('Resume error:', e)
     } finally {
       setResuming(null)
+    }
+  }
+
+  // ── AI summary ──
+  async function handleSummarize() {
+    if (!selected || summarizing) return
+    setSummarizing(true)
+    setSummary(null)
+    try {
+      const res = await fetch(`${API_URL}/session/summary`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          session_id: selected.session_id,
+          client_id:  botClientId || 'dental_demo',
+        })
+      })
+      const data = await res.json()
+      setSummary(data.summary || 'No summary available.')
+    } catch (e) {
+      setSummary('Failed to generate summary. Please try again.')
+    } finally {
+      setSummarizing(false)
     }
   }
 
@@ -361,35 +387,78 @@ export default function ConversationsPage() {
         ) : (
           <>
             {/* Chat header */}
-            <div className="px-6 py-4 border-b border-white/[0.06] bg-white/[0.02] flex items-center justify-between shrink-0">
-              <div>
-                <p className="text-[13.5px] font-semibold text-white">{maskPhone(selected.phone)}</p>
-                <p className="text-[12px] text-white/30 mt-0.5">
-                  {liveMessages.length} messages · Last active {formatTimestamp(selected.lastAt)}
-                </p>
+            <div className="shrink-0 border-b border-white/[0.06] bg-white/[0.02]">
+              <div className="px-6 py-4 flex items-center justify-between">
+                <div>
+                  <p className="text-[13.5px] font-semibold text-white">{maskPhone(selected.phone)}</p>
+                  <p className="text-[12px] text-white/30 mt-0.5">
+                    {liveMessages.length} messages · Last active {formatTimestamp(selected.lastAt)}
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <StatusBadge status={selectedStatus} />
+
+                  {/* Summarize button — always shown when there are messages */}
+                  {liveMessages.length > 0 && (
+                    <button
+                      onClick={handleSummarize}
+                      disabled={summarizing}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11.5px] font-medium
+                                 bg-white/[0.05] text-white/50 border border-white/[0.08]
+                                 hover:bg-white/[0.08] hover:text-white/70 transition-colors
+                                 disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                      {summarizing ? (
+                        <>
+                          <span className="w-3 h-3 border border-white/40 border-t-white/70 rounded-full animate-spin" />
+                          Summarizing…
+                        </>
+                      ) : (
+                        <>✦ Summary</>
+                      )}
+                    </button>
+                  )}
+
+                  {isHandedOff && (
+                    <button
+                      onClick={() => handleResume(selected)}
+                      disabled={resuming === normalizePhone(selected.phone)}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11.5px] font-medium
+                                 bg-[#00e5b0]/10 text-[#00e5b0] border border-[#00e5b0]/25
+                                 hover:bg-[#00e5b0]/20 transition-colors
+                                 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {resuming === normalizePhone(selected.phone) ? (
+                        <>
+                          <span className="w-3 h-3 border border-[#00e5b0]/60 border-t-[#00e5b0] rounded-full animate-spin" />
+                          Resuming…
+                        </>
+                      ) : (
+                        <>🤖 Resume Bot</>
+                      )}
+                    </button>
+                  )}
+                </div>
               </div>
-              <div className="flex items-center gap-3">
-                <StatusBadge status={selectedStatus} />
-                {isHandedOff && (
+
+              {/* AI Summary panel — shown after clicking Summarize */}
+              {summary && (
+                <div className="mx-6 mb-4 bg-white/[0.03] border border-white/[0.07] rounded-xl px-4 py-3 flex gap-3">
+                  <span className="text-[#00e5b0] text-[14px] shrink-0 mt-0.5">✦</span>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[11px] text-[#00e5b0] font-semibold uppercase tracking-wider mb-1.5">AI Summary</p>
+                    <p className="text-[12.5px] text-white/70 leading-relaxed">{summary}</p>
+                  </div>
                   <button
-                    onClick={() => handleResume(selected)}
-                    disabled={resuming === normalizePhone(selected.phone)}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11.5px] font-medium
-                               bg-[#00e5b0]/10 text-[#00e5b0] border border-[#00e5b0]/25
-                               hover:bg-[#00e5b0]/20 transition-colors
-                               disabled:opacity-50 disabled:cursor-not-allowed"
+                    onClick={() => setSummary(null)}
+                    className="text-white/20 hover:text-white/50 transition-colors shrink-0 self-start"
                   >
-                    {resuming === normalizePhone(selected.phone) ? (
-                      <>
-                        <span className="w-3 h-3 border border-[#00e5b0]/60 border-t-[#00e5b0] rounded-full animate-spin" />
-                        Resuming…
-                      </>
-                    ) : (
-                      <>🤖 Resume Bot</>
-                    )}
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="w-3.5 h-3.5">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
                   </button>
-                )}
-              </div>
+                </div>
+              )}
             </div>
 
             {/* Message thread */}

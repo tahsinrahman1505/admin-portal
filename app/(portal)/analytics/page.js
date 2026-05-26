@@ -10,6 +10,38 @@ import {
 import { supabase } from '@/lib/supabase'
 import { AnalyticsSkeleton } from '@/components/Skeleton'
 
+/* ─── response time helpers ─── */
+function computeResponseTimes(rows) {
+  // Group messages by session_id, sorted by created_at
+  const sessions = {}
+  for (const r of rows) {
+    if (!sessions[r.session_id]) sessions[r.session_id] = []
+    sessions[r.session_id].push(r)
+  }
+  const botMs = [], humanMs = []
+  for (const msgs of Object.values(sessions)) {
+    msgs.sort((a, b) => new Date(a.created_at) - new Date(b.created_at))
+    for (let i = 0; i < msgs.length - 1; i++) {
+      if (msgs[i].role !== 'customer') continue
+      const next = msgs[i + 1]
+      if (!next) continue
+      const diff = new Date(next.created_at) - new Date(msgs[i].created_at)
+      if (diff <= 0 || diff > 1800000) continue // ignore > 30 min (likely abandoned)
+      if (next.role === 'bot')   botMs.push(diff)
+      if (next.role === 'owner') humanMs.push(diff)
+    }
+  }
+  const avg = arr => arr.length ? Math.round(arr.reduce((a, b) => a + b, 0) / arr.length) : null
+  return { avgBot: avg(botMs), avgHuman: avg(humanMs), botCount: botMs.length, humanCount: humanMs.length }
+}
+
+function fmtDuration(ms) {
+  if (ms === null) return 'N/A'
+  if (ms < 1000)   return `${ms}ms`
+  if (ms < 60000)  return `${(ms / 1000).toFixed(1)}s`
+  return `${(ms / 60000).toFixed(1)}m`
+}
+
 /* ─── helpers ─── */
 function buildLast7Days(rows) {
   const days = []
@@ -116,6 +148,7 @@ export default function AnalyticsPage() {
   const [range, setRange] = useState('7d')
   const [convRows, setConvRows] = useState([])
   const [msgRows, setMsgRows] = useState([])
+  const [rtRows, setRtRows] = useState([])   // for response-time calculation
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -125,12 +158,14 @@ export default function AnalyticsPage() {
       since.setDate(since.getDate() - (range === '7d' ? 7 : 30))
       const iso = since.toISOString()
 
-      const [{ data: convs }, { data: msgs }] = await Promise.all([
+      const [{ data: convs }, { data: msgs }, { data: rt }] = await Promise.all([
         supabase.from('conversations').select('created_at, lead_status').gte('created_at', iso),
         supabase.from('messages').select('created_at').gte('created_at', iso),
+        supabase.from('conversations').select('session_id, role, created_at').gte('created_at', iso),
       ])
       setConvRows(convs ?? [])
       setMsgRows(msgs ?? [])
+      setRtRows(rt ?? [])
       setLoading(false)
     }
     load()
@@ -144,6 +179,7 @@ export default function AnalyticsPage() {
   const totalLeads = convRows.filter(r => r.lead_status && r.lead_status !== 'none').length
   const convRate = totalConvs ? Math.round((totalLeads / totalConvs) * 100) : 0
   const peakHour = hourData.reduce((best, h) => h.messages > best.messages ? h : best, { hour: '--', messages: 0 })
+  const rt = computeResponseTimes(rtRows)
 
   return (
     <div className="p-7 max-w-[1100px] mx-auto">
@@ -246,6 +282,127 @@ export default function AnalyticsPage() {
           </BarChart>
         </ResponsiveContainer>
       </ChartCard>
+
+      {/* ── Response Time Analytics ── */}
+      <motion.div
+        initial={{ opacity: 0, y: 16 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5, delay: 0.4, ease: [0.16, 1, 0.3, 1] }}
+        className="mt-4 bg-white/[0.03] border border-white/[0.07] rounded-2xl p-5"
+      >
+        <div className="mb-5">
+          <p className="text-white font-semibold text-[14px]" style={{ fontFamily: 'var(--font-jakarta)' }}>
+            Response Time Analytics
+          </p>
+          <p className="text-white/30 text-[11.5px] mt-0.5" style={{ fontFamily: 'var(--font-jakarta)' }}>
+            Average time between customer message and first reply · {range === '7d' ? 'last 7 days' : 'last 30 days'}
+          </p>
+        </div>
+
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          {/* Bot response time */}
+          <div className="bg-white/[0.03] border border-white/[0.05] rounded-xl px-4 py-3.5">
+            <div className="flex items-center gap-2 mb-2">
+              <div className="w-2 h-2 rounded-full bg-[#00e5b0]" />
+              <p className="text-[11px] text-white/35 uppercase tracking-wider font-medium" style={{ fontFamily: 'var(--font-jakarta)' }}>
+                Avg Bot Response
+              </p>
+            </div>
+            <p className="text-white font-extrabold text-[1.5rem] leading-none tracking-tight" style={{ fontFamily: 'var(--font-jakarta)' }}>
+              {fmtDuration(rt.avgBot)}
+            </p>
+            <p className="text-white/25 text-[11px] mt-1.5" style={{ fontFamily: 'var(--font-jakarta)' }}>
+              {rt.botCount} replies measured
+            </p>
+          </div>
+
+          {/* Human response time */}
+          <div className="bg-white/[0.03] border border-white/[0.05] rounded-xl px-4 py-3.5">
+            <div className="flex items-center gap-2 mb-2">
+              <div className="w-2 h-2 rounded-full bg-indigo-400" />
+              <p className="text-[11px] text-white/35 uppercase tracking-wider font-medium" style={{ fontFamily: 'var(--font-jakarta)' }}>
+                Avg Human Response
+              </p>
+            </div>
+            <p className="text-white font-extrabold text-[1.5rem] leading-none tracking-tight" style={{ fontFamily: 'var(--font-jakarta)' }}>
+              {fmtDuration(rt.avgHuman)}
+            </p>
+            <p className="text-white/25 text-[11px] mt-1.5" style={{ fontFamily: 'var(--font-jakarta)' }}>
+              {rt.humanCount} handoff replies
+            </p>
+          </div>
+
+          {/* Bot reply count */}
+          <div className="bg-white/[0.03] border border-white/[0.05] rounded-xl px-4 py-3.5">
+            <div className="flex items-center gap-2 mb-2">
+              <div className="w-2 h-2 rounded-full bg-white/20" />
+              <p className="text-[11px] text-white/35 uppercase tracking-wider font-medium" style={{ fontFamily: 'var(--font-jakarta)' }}>
+                Bot Resolved
+              </p>
+            </div>
+            <p className="text-white font-extrabold text-[1.5rem] leading-none tracking-tight" style={{ fontFamily: 'var(--font-jakarta)' }}>
+              {rt.botCount > 0 ? `${rt.botCount}` : '—'}
+            </p>
+            <p className="text-white/25 text-[11px] mt-1.5" style={{ fontFamily: 'var(--font-jakarta)' }}>
+              customer messages
+            </p>
+          </div>
+
+          {/* Handoff count */}
+          <div className="bg-white/[0.03] border border-white/[0.05] rounded-xl px-4 py-3.5">
+            <div className="flex items-center gap-2 mb-2">
+              <div className="w-2 h-2 rounded-full bg-amber-400" />
+              <p className="text-[11px] text-white/35 uppercase tracking-wider font-medium" style={{ fontFamily: 'var(--font-jakarta)' }}>
+                Human Handled
+              </p>
+            </div>
+            <p className="text-white font-extrabold text-[1.5rem] leading-none tracking-tight" style={{ fontFamily: 'var(--font-jakarta)' }}>
+              {rt.humanCount > 0 ? `${rt.humanCount}` : '—'}
+            </p>
+            <p className="text-white/25 text-[11px] mt-1.5" style={{ fontFamily: 'var(--font-jakarta)' }}>
+              owner replies sent
+            </p>
+          </div>
+        </div>
+
+        {/* Visual comparison bar */}
+        {(rt.avgBot !== null || rt.avgHuman !== null) && (
+          <div className="mt-5 space-y-3">
+            {rt.avgBot !== null && (
+              <div>
+                <div className="flex justify-between items-center mb-1">
+                  <span className="text-[11px] text-white/40" style={{ fontFamily: 'var(--font-jakarta)' }}>Bot · {fmtDuration(rt.avgBot)}</span>
+                </div>
+                <div className="h-1.5 bg-white/[0.05] rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-[#00e5b0] rounded-full transition-all duration-700"
+                    style={{ width: `${Math.min(100, (rt.avgBot / Math.max(rt.avgBot, rt.avgHuman || 1)) * 100)}%` }}
+                  />
+                </div>
+              </div>
+            )}
+            {rt.avgHuman !== null && (
+              <div>
+                <div className="flex justify-between items-center mb-1">
+                  <span className="text-[11px] text-white/40" style={{ fontFamily: 'var(--font-jakarta)' }}>Human · {fmtDuration(rt.avgHuman)}</span>
+                </div>
+                <div className="h-1.5 bg-white/[0.05] rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-indigo-400 rounded-full transition-all duration-700"
+                    style={{ width: `${Math.min(100, (rt.avgHuman / Math.max(rt.avgBot || 1, rt.avgHuman)) * 100)}%` }}
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {rt.botCount === 0 && rt.humanCount === 0 && (
+          <p className="text-white/20 text-[12px] text-center py-4" style={{ fontFamily: 'var(--font-jakarta)' }}>
+            No response time data yet for this period
+          </p>
+        )}
+      </motion.div>
     </div>
   )
 }

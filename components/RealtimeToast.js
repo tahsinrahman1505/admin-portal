@@ -3,6 +3,9 @@ import { useEffect, useState, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { supabase } from '@/lib/supabase'
 
+let _toastCounter = 0
+function uniqueId() { return `toast_${Date.now()}_${++_toastCounter}` }
+
 function maskPhone(phone) {
   if (!phone) return 'Unknown'
   const s = phone.replace(/\D/g, '')
@@ -12,9 +15,10 @@ function maskPhone(phone) {
 export default function RealtimeToast() {
   const [toasts, setToasts] = useState([])
   const clientIdRef = useRef(null)
+  // Track which session IDs have already fired a toast recently to avoid snapshot floods
+  const recentRef = useRef(new Set())
 
   useEffect(() => {
-    // get client id for filtering
     supabase.auth.getUser().then(async ({ data: { user } }) => {
       if (!user) return
       const { data } = await supabase.from('clients').select('id').eq('user_id', user.id).single()
@@ -22,37 +26,42 @@ export default function RealtimeToast() {
     })
 
     const channel = supabase
-      .channel('realtime-conversations')
+      .channel('realtime-conversations-toast')
       .on('postgres_changes', {
         event: 'INSERT',
         schema: 'public',
         table: 'conversations',
       }, (payload) => {
         const row = payload.new
-        // only show for this client
         if (clientIdRef.current && row.client_id !== clientIdRef.current) return
         if (row.role !== 'customer') return
 
-        const id = Date.now()
-        const toast = {
-          id,
-          phone: row.phone_number || 'Unknown',
-          message: row.message || '',
-        }
-        setToasts(prev => [...prev.slice(-2), toast]) // max 3 at once
-        setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 5000)
+        // Debounce: only one toast per session per 8 seconds (prevents snapshot floods)
+        const sid = row.session_id
+        if (recentRef.current.has(sid)) return
+        recentRef.current.add(sid)
+        setTimeout(() => recentRef.current.delete(sid), 8000)
+
+        const id = uniqueId()
+        setToasts(prev => [...prev.slice(-2), { id, phone: row.phone_number || 'Unknown', message: row.message || '' }])
+        setTimeout(() => dismiss(id), 6000)
       })
       .subscribe()
 
     return () => { supabase.removeChannel(channel) }
   }, [])
 
+  function dismiss(id) {
+    setToasts(prev => prev.filter(t => t.id !== id))
+  }
+
   return (
     <div className="fixed bottom-6 right-6 z-[200] flex flex-col gap-2.5 items-end pointer-events-none">
-      <AnimatePresence>
+      <AnimatePresence mode="popLayout">
         {toasts.map(toast => (
           <motion.div
             key={toast.id}
+            layout
             initial={{ opacity: 0, x: 40, scale: 0.92 }}
             animate={{ opacity: 1, x: 0, scale: 1 }}
             exit={{ opacity: 0, x: 20, scale: 0.95 }}
@@ -69,9 +78,17 @@ export default function RealtimeToast() {
               </div>
             </div>
             {/* Text */}
-            <div className="min-w-0">
-              <div className="flex items-center gap-1.5 mb-0.5">
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center justify-between gap-2 mb-0.5">
                 <p className="text-[11px] font-semibold text-[#00e5b0] uppercase tracking-wider">New Message</p>
+                <button
+                  onClick={() => dismiss(toast.id)}
+                  className="text-white/30 hover:text-white/70 transition-colors shrink-0 -mr-1"
+                >
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="w-3.5 h-3.5">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
               </div>
               <p className="text-[12.5px] font-medium text-white leading-snug">{maskPhone(toast.phone)}</p>
               <p className="text-[11.5px] text-white/40 mt-0.5 truncate max-w-[200px]">{toast.message}</p>

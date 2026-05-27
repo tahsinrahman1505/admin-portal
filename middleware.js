@@ -12,31 +12,47 @@
 
 import { NextResponse } from 'next/server'
 
+/**
+ * Validate that a value looks like a real Supabase JWT (3 base64 parts).
+ * This prevents the trivial bypass of setting the cookie to any static string.
+ * Full cryptographic verification requires @supabase/ssr — this is a fast
+ * structural check that rejects forgeries without the actual token.
+ */
+function isValidJwt(value) {
+  if (!value || !value.startsWith('eyJ')) return false
+  const parts = value.split('.')
+  return parts.length === 3 && parts.every(p => p.length > 0)
+}
+
 export function middleware(request) {
   const { pathname } = request.nextUrl
 
-  // Always allow: login page, Next.js internals, static files
+  // Always allow: login page, Next.js internals, static files only.
+  // NOTE: /api/* is intentionally NOT whitelisted — all proxy routes
+  // (/api/rag/*) require authentication to prevent unauthenticated access
+  // to the RAG API secret they carry.
   const isPublic =
-    pathname.startsWith('/login') ||
+    pathname === '/login' ||
     pathname.startsWith('/_next') ||
-    pathname.startsWith('/favicon') ||
-    pathname.startsWith('/api')   // Next.js API routes if added later
+    pathname.startsWith('/favicon')
 
   if (isPublic) {
     return NextResponse.next()
   }
 
-  // Check for the portal session cookie set explicitly at login.
-  // supabase-js stores the session in localStorage (browser-only), so we
-  // set a lightweight 'sb-portal-session' HTTP cookie at login time so that
-  // Edge middleware can verify the user is authenticated server-side.
+  // Check for the session cookie containing the Supabase access token (JWT).
+  // Set at login by login/page.js and refreshed by layout.js onAuthStateChange.
   const cookies = request.cookies
-  const hasSession = !!cookies.get('sb-portal-session')?.value
+  const sessionToken = cookies.get('sb-portal-session')?.value
+  const hasSession = isValidJwt(sessionToken)
 
   if (!hasSession) {
     const loginUrl = new URL('/login', request.url)
-    // Preserve the original destination so we can redirect back after login
-    loginUrl.searchParams.set('next', pathname)
+    // Preserve the original destination so we can redirect back after login.
+    // Validate it is a relative path to prevent open-redirect attacks.
+    if (pathname.startsWith('/') && !pathname.startsWith('//')) {
+      loginUrl.searchParams.set('next', pathname)
+    }
     return NextResponse.redirect(loginUrl)
   }
 

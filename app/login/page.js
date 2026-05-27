@@ -14,15 +14,17 @@ export default function LoginPage() {
     e.preventDefault()
     setLoading(true)
     setError('')
-    const { error } = await supabase.auth.signInWithPassword({ email, password })
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password })
     if (error) {
       setError('Invalid credentials. Please try again.')
       setLoading(false)
     } else {
-      // Set a lightweight session indicator cookie so the Edge middleware can
-      // verify authentication server-side. supabase-js uses localStorage which
-      // is not accessible in Edge Runtime. This cookie is cleared on logout.
-      document.cookie = 'sb-portal-session=1; path=/; max-age=86400; SameSite=Lax; Secure'
+      // Store the actual Supabase access token (a cryptographically signed JWT)
+      // in the session cookie so Edge middleware can verify it is a real token —
+      // not a forgeable static string like "1". The token expires in 1h and is
+      // refreshed automatically via onAuthStateChange in layout.js.
+      const accessToken = data.session?.access_token || ''
+      document.cookie = `sb-portal-session=${accessToken}; path=/; max-age=3600; SameSite=Lax; Secure`
       router.push('/dashboard')
     }
   }

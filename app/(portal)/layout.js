@@ -55,12 +55,25 @@ export default function PortalLayout({ children }) {
       if (!user) { router.push('/login'); return }
       setUserEmail(user.email)
     })
+
+    // Keep the sb-portal-session cookie in sync with Supabase token refreshes.
+    // supabase-js silently refreshes the access token before it expires — we
+    // mirror the new token into the cookie so Edge middleware stays valid.
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if ((event === 'TOKEN_REFRESHED' || event === 'SIGNED_IN') && session?.access_token) {
+        document.cookie = `sb-portal-session=${session.access_token}; path=/; max-age=3600; SameSite=Lax; Secure`
+      }
+      if (event === 'SIGNED_OUT') {
+        document.cookie = 'sb-portal-session=; path=/; max-age=0; SameSite=Lax; Secure'
+        router.push('/login')
+      }
+    })
+    return () => subscription.unsubscribe()
   }, [])
 
   async function handleLogout() {
     await supabase.auth.signOut()
-    // Clear the session indicator cookie set at login
-    document.cookie = 'sb-portal-session=; path=/; max-age=0; SameSite=Lax; Secure'
+    // Cookie is cleared automatically by the onAuthStateChange SIGNED_OUT handler above.
     router.push('/login')
   }
 

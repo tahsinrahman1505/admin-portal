@@ -19,6 +19,10 @@ export default function LoginPage() {
       setError('Invalid credentials. Please try again.')
       setLoading(false)
     } else {
+      // Set a lightweight session indicator cookie so the Edge middleware can
+      // verify authentication server-side. supabase-js uses localStorage which
+      // is not accessible in Edge Runtime. This cookie is cleared on logout.
+      document.cookie = 'sb-portal-session=1; path=/; max-age=86400; SameSite=Lax; Secure'
       router.push('/dashboard')
     }
   }

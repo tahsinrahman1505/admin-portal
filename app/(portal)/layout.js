@@ -59,6 +59,8 @@ export default function PortalLayout({ children }) {
 
   async function handleLogout() {
     await supabase.auth.signOut()
+    // Clear the session indicator cookie set at login
+    document.cookie = 'sb-portal-session=; path=/; max-age=0; SameSite=Lax; Secure'
     router.push('/login')
   }
 

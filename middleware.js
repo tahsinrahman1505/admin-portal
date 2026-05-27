@@ -26,12 +26,12 @@ export function middleware(request) {
     return NextResponse.next()
   }
 
-  // Check for Supabase auth cookie (set by supabase-js on sign-in).
-  // Cookie name format: sb-<project-ref>-auth-token
+  // Check for the portal session cookie set explicitly at login.
+  // supabase-js stores the session in localStorage (browser-only), so we
+  // set a lightweight 'sb-portal-session' HTTP cookie at login time so that
+  // Edge middleware can verify the user is authenticated server-side.
   const cookies = request.cookies
-  const hasSession = [...cookies.getAll()].some(
-    c => c.name.startsWith('sb-') && c.name.endsWith('-auth-token') && c.value
-  )
+  const hasSession = !!cookies.get('sb-portal-session')?.value
 
   if (!hasSession) {
     const loginUrl = new URL('/login', request.url)

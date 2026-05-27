@@ -5,9 +5,9 @@ import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { ConversationsSkeleton } from '@/components/Skeleton'
 
-const API_URL     = process.env.NEXT_PUBLIC_API_URL || ''
-const API_SECRET  = process.env.NEXT_PUBLIC_RAG_API_SECRET || ''
-const API_HEADERS = { 'Content-Type': 'application/json', 'x-api-key': API_SECRET }
+// API calls go through server-side proxy routes so the secret never hits the browser
+const API_URL     = '/api/rag'
+const API_HEADERS = { 'Content-Type': 'application/json' }
 
 function maskPhone(phone) {
   if (!phone) return 'Unknown'

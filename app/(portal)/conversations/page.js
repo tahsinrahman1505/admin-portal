@@ -215,6 +215,10 @@ export default function ConversationsPage() {
         filter: `client_id=eq.${portalClientId}`,
       }, (payload) => {
         const newRow = payload.new
+        // Refresh handoff sessions whenever a handoff status row arrives
+        if (newRow.session_status === 'Handed Off') {
+          loadHandoffSessions(botClientId)
+        }
         setThreads(prev => {
           const idx = prev.findIndex(t => t.session_id === newRow.session_id)
           if (idx === -1) {
@@ -266,7 +270,7 @@ export default function ConversationsPage() {
 
     realtimeRef.current = channel
     return () => { supabase.removeChannel(channel) }
-  }, [portalClientId])
+  }, [portalClientId, botClientId, loadHandoffSessions])
 
   // ── Switch liveMessages when selected thread changes ──
   useEffect(() => {

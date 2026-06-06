@@ -184,7 +184,8 @@ export default function ConversationsPage() {
         channel:      messages[0]?.channel || 'whatsapp',
         // keep phone for compat
         phone:        messages[0]?.phone_number || 'Unknown',
-        status:       messages[0]?.session_status || 'Handed Off',
+        // Use LAST message status — most recent reflects actual current state
+        status:       messages[messages.length - 1]?.session_status || messages[0]?.session_status || 'Handled by Bot',
         firstMessage: messages.find(m => m.role === 'customer')?.message || messages[0]?.message,
         lastAt:       messages[messages.length - 1]?.created_at,
         messages,
@@ -282,6 +283,13 @@ export default function ConversationsPage() {
 
   // ── Handoff check — now channel-aware ──
   function isHandedOff(thread) {
+    // Primary: check messages directly — conversations table is readable by anon,
+    // sessions table is RLS-blocked so handoffSessions is often empty.
+    const msgs = thread.messages || []
+    if (msgs.some(m => m.session_status === 'Handed Off')) return true
+    // Also check thread-level status (set from last message)
+    if (thread.status === 'Handed Off') return true
+    // Fallback: sessions table check (works if RLS allows)
     const norm = normalizeIdentity(thread.sender_id || thread.phone)
     return handoffSessions.some(h => h.sender_id === norm)
   }

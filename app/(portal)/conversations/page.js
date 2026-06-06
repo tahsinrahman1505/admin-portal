@@ -422,7 +422,7 @@ export default function ConversationsPage() {
             return (
               <button
                 key={thread.session_id}
-                onClick={() => { setSelected(thread); setLiveMessages(thread.messages) }}
+                onClick={() => { setSelected(thread); setLiveMessages(thread.messages); loadHandoffSessions(botClientId) }}
                 className={`w-full text-left px-4 py-3.5 border-b border-white/[0.04] hover:bg-white/[0.03] transition-colors ${
                   selected?.session_id === thread.session_id
                     ? 'bg-[#00e5b0]/[0.05] border-l-2 border-l-[#00e5b0]/50'

@@ -74,7 +74,7 @@ const CHANNEL_TABS = ['all', 'whatsapp', 'instagram', 'messenger']
 
 function ChannelTabs({ active, onChange, counts }) {
   return (
-    <div className="flex items-center gap-1 px-4 py-2 border-b border-white/[0.06]">
+    <div className="flex items-center gap-1 px-4 py-2 border-b border-white/[0.06] overflow-x-auto scrollbar-none" style={{ scrollbarWidth: 'none' }}>
       {CHANNEL_TABS.map(ch => {
         const m = ch === 'all' ? null : CHANNEL_META[ch]
         const count = counts[ch] || 0
@@ -82,7 +82,7 @@ function ChannelTabs({ active, onChange, counts }) {
           <button
             key={ch}
             onClick={() => onChange(ch)}
-            className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-medium transition-colors ${
+            className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-medium transition-colors shrink-0 ${
               active === ch
                 ? 'bg-white/10 text-white'
                 : 'text-white/35 hover:text-white/60 hover:bg-white/5'
@@ -121,8 +121,9 @@ export default function ConversationsPage() {
   const [summarizing, setSummarizing]   = useState(false)
 
   const [liveMessages, setLiveMessages] = useState([])
-  const bottomRef  = useRef(null)
+  const bottomRef   = useRef(null)
   const realtimeRef = useRef(null)
+
 
   // ── Load handoff sessions ──
   const loadHandoffSessions = useCallback(async (botCid) => {
@@ -387,7 +388,7 @@ export default function ConversationsPage() {
   return (
     <div className="flex h-full overflow-hidden text-white">
       {/* ── Thread list ── */}
-      <div className="w-72 shrink-0 flex flex-col border-r border-white/[0.06] bg-white/[0.015]">
+      <div className="w-72 shrink-0 flex flex-col border-r border-white/[0.06] bg-white/[0.015] overflow-x-auto">
         <div className="px-4 py-4 border-b border-white/[0.06]">
           <div className="flex items-center justify-between mb-3">
             <h1 className="text-[13px] font-semibold text-white">All Conversations</h1>

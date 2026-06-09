@@ -181,7 +181,9 @@ export default function ConversationsPage() {
       const threadList = Object.entries(map).map(([sid, messages]) => ({
         session_id:   sid,
         sender_id:    messages[0]?.phone_number || sid,
-        channel:      messages[0]?.channel || 'whatsapp',
+        // Use LAST message's channel — a patient may have switched channels
+        // (e.g. old WhatsApp history + new Instagram handoff → show as Instagram)
+        channel:      messages[messages.length - 1]?.channel || messages[0]?.channel || 'whatsapp',
         // keep phone for compat
         phone:        messages[0]?.phone_number || 'Unknown',
         // Use LAST message status — most recent reflects actual current state

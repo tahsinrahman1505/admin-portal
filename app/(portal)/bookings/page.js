@@ -9,6 +9,9 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 );
 
+// H6 fix: always scope queries to this portal's clinic
+const CLIENT_ID = process.env.NEXT_PUBLIC_CLIENT_ID || 'dental_demo';
+
 const STATUS_STYLES = {
   confirmed: { bg: 'bg-[#00e5b0]/[0.12]', text: 'text-[#00e5b0]', border: 'border-[#00e5b0]/20', dot: 'bg-[#00e5b0]', block: 'bg-[#00e5b0]/20 border-[#00e5b0]/30 text-[#00e5b0]' },
   pending:   { bg: 'bg-amber-500/[0.1]',  text: 'text-amber-300',  border: 'border-amber-500/20', dot: 'bg-amber-400', block: 'bg-amber-500/15 border-amber-500/25 text-amber-300' },
@@ -92,6 +95,7 @@ export default function BookingsPage() {
       const { data } = await supabase
         .from('pending_bookings')
         .select('*')
+        .eq('client_id', CLIENT_ID)
         .order('created_at', { ascending: true });
       setBookings(data || []);
       setLoading(false);

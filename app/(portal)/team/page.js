@@ -2,16 +2,17 @@
 import { useEffect, useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 
-const API_URL  = process.env.NEXT_PUBLIC_API_URL;
-const API_KEY  = process.env.NEXT_PUBLIC_RAG_API_KEY;
-const CLIENT_ID = process.env.NEXT_PUBLIC_CLIENT_ID ?? 'dental_demo';
+// All doctor API calls go through server-side proxy routes (/api/rag/doctors/*)
+// so RAG_API_SECRET never touches the browser bundle.
+const PROXY_BASE = '/api/rag/doctors';
+const CLIENT_ID  = process.env.NEXT_PUBLIC_CLIENT_ID ?? 'dental_demo';
 
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 const inputCls = "w-full px-3 py-2.5 bg-white/[0.04] border border-white/[0.08] rounded-xl text-[13px] text-white placeholder-white/20 outline-none focus:border-[#00e5b0]/40 transition-all duration-200";
 const btnCls   = "px-4 py-2 rounded-xl text-[12px] font-semibold transition-all duration-200";
 
 function headers() {
-  return { 'Content-Type': 'application/json', 'x-api-key': API_KEY };
+  return { 'Content-Type': 'application/json' };
 }
 
 // ── Doctor card ──────────────────────────────────────────────────────────────
@@ -70,7 +71,7 @@ function DoctorModal({ doctor, onSave, onClose }) {
     setSaving(true);
     setErr('');
     try {
-      const url    = isEdit ? `${API_URL}/doctors/${doctor.id}` : `${API_URL}/doctors`;
+      const url    = isEdit ? `${PROXY_BASE}/${doctor.id}?client_id=${CLIENT_ID}` : PROXY_BASE;
       const method = isEdit ? 'PUT' : 'POST';
       const body   = isEdit ? form : { ...form, client_id: CLIENT_ID };
       const r = await fetch(url, { method, headers: headers(), body: JSON.stringify(body) });
@@ -135,7 +136,7 @@ function ManagePanel({ doctor, onClose }) {
   const loadSchedule = useCallback(async () => {
     setLoadingSch(true);
     try {
-      const r = await fetch(`${API_URL}/doctors/${doctor.id}/schedule`, { headers: headers() });
+      const r = await fetch(`${PROXY_BASE}/${doctor.id}/schedule`, { headers: headers() });
       const d = await r.json();
       // Ensure all 7 days present, fill missing with defaults
       const map = {};
@@ -152,7 +153,7 @@ function ManagePanel({ doctor, onClose }) {
   const loadLeaves = useCallback(async () => {
     setLoadingLv(true);
     try {
-      const r = await fetch(`${API_URL}/doctors/${doctor.id}/leaves`, { headers: headers() });
+      const r = await fetch(`${PROXY_BASE}/${doctor.id}/leaves`, { headers: headers() });
       const d = await r.json();
       setLeaves(d.leaves || []);
     } finally { setLoadingLv(false); }
@@ -167,7 +168,7 @@ function ManagePanel({ doctor, onClose }) {
   async function saveSchedule() {
     setSaving(true); setMsg('');
     try {
-      const r = await fetch(`${API_URL}/doctors/${doctor.id}/schedule`, {
+      const r = await fetch(`${PROXY_BASE}/${doctor.id}/schedule?client_id=${CLIENT_ID}`, {
         method: 'PUT', headers: headers(), body: JSON.stringify(schedule),
       });
       if (!r.ok) throw new Error(await r.text());
@@ -178,7 +179,7 @@ function ManagePanel({ doctor, onClose }) {
   }
 
   async function deleteLeave(leaveId) {
-    await fetch(`${API_URL}/doctors/${doctor.id}/leaves/${leaveId}`, { method: 'DELETE', headers: headers() });
+    await fetch(`${PROXY_BASE}/${doctor.id}/leaves/${leaveId}?client_id=${CLIENT_ID}`, { method: 'DELETE', headers: headers() });
     loadLeaves();
   }
 
@@ -186,7 +187,7 @@ function ManagePanel({ doctor, onClose }) {
     if (!leaveForm.leave_date) { setMsg('Please select a date.'); return; }
     setSaving(true);
     try {
-      const r = await fetch(`${API_URL}/doctors/${doctor.id}/leaves`, {
+      const r = await fetch(`${PROXY_BASE}/${doctor.id}/leaves?client_id=${CLIENT_ID}`, {
         method: 'POST', headers: headers(), body: JSON.stringify(leaveForm),
       });
       if (!r.ok) throw new Error(await r.text());
@@ -385,7 +386,7 @@ export default function TeamPage() {
   const loadDoctors = useCallback(async () => {
     setLoading(true);
     try {
-      const r = await fetch(`${API_URL}/doctors?client_id=${CLIENT_ID}`, { headers: headers() });
+      const r = await fetch(`${PROXY_BASE}?client_id=${CLIENT_ID}`, { headers: headers() });
       const d = await r.json();
       setDoctors(d.doctors || []);
     } catch { setDoctors([]); }
@@ -396,7 +397,7 @@ export default function TeamPage() {
 
   async function handleDeactivate(id) {
     if (!confirm('Deactivate this doctor? They will no longer receive bookings.')) return;
-    await fetch(`${API_URL}/doctors/${id}`, { method: 'DELETE', headers: headers() });
+    await fetch(`${PROXY_BASE}/${id}?client_id=${CLIENT_ID}`, { method: 'DELETE', headers: headers() });
     loadDoctors();
   }
 

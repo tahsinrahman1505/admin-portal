@@ -1,16 +1,9 @@
 'use client';
-import { useEffect, useState } from 'react';
-import { createClient } from '@supabase/supabase-js';
+import { useEffect, useState, useCallback, useRef } from 'react';
+import { useRouter } from 'next/navigation';
+import { supabase } from '@/lib/supabase';
 import { motion, AnimatePresence } from 'framer-motion';
 import { TableSkeleton } from '@/components/Skeleton';
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-);
-
-// H6 fix: always scope queries to this portal's clinic
-const CLIENT_ID = process.env.NEXT_PUBLIC_CLIENT_ID || 'dental_demo';
 
 const STATUS_STYLES = {
   confirmed: { bg: 'bg-[#00e5b0]/[0.12]', text: 'text-[#00e5b0]', border: 'border-[#00e5b0]/20', dot: 'bg-[#00e5b0]', block: 'bg-[#00e5b0]/20 border-[#00e5b0]/30 text-[#00e5b0]' },
@@ -38,11 +31,136 @@ function formatDateLabel(date) {
   return date.toLocaleDateString('en-AE', { month: 'short', day: 'numeric' });
 }
 
+const patientName = (b) => b.patient_name || b.name || 'Unnamed patient';
+
+// Split a stored appointment_date (ISO datetime) into <input> date/time values.
+function splitForInputs(iso) {
+  if (!iso) return { date: '', time: '' };
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return { date: '', time: '' };
+  const pad = (n) => String(n).padStart(2, '0');
+  return {
+    date: `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`,
+    time: `${pad(d.getHours())}:${pad(d.getMinutes())}`,
+  };
+}
+
+/* ── Create / Edit form modal ── */
+// Mounted only while open, with a key tied to the booking being edited, so the
+// lazy initializer below runs fresh each open — no sync setState-in-effect.
+function BookingFormModal({ open, onClose, onSubmit, initial, saving }) {
+  const [form, setForm] = useState(() => {
+    if (initial) {
+      const { date, time } = splitForInputs(initial.appointment_date);
+      return {
+        patient_name: initial.patient_name || initial.name || '',
+        phone: initial.phone || '',
+        service: initial.service || '',
+        date, time,
+        status: initial.status || 'confirmed',
+        notes: initial.notes || '',
+      };
+    }
+    return { patient_name: '', phone: '', service: '', date: '', time: '', status: 'confirmed', notes: '' };
+  });
+  const [err, setErr] = useState('');
+
+  if (!open) return null;
+
+  const field = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
+
+  async function submit() {
+    if (!form.patient_name.trim()) { setErr('Patient name is required.'); return; }
+    const appointment_date = form.date ? `${form.date}T${form.time || '09:00'}` : '';
+    const res = await onSubmit({
+      patient_name: form.patient_name.trim(),
+      phone: form.phone.trim(),
+      service: form.service.trim(),
+      appointment_date,
+      status: form.status,
+      notes: form.notes.trim(),
+    });
+    if (res?.warning) setErr(res.warning);
+    else if (res?.ok === false) setErr(res.error || 'Could not save.');
+  }
+
+  const inputCls = 'w-full bg-white/[0.04] border border-white/[0.08] rounded-xl px-3 py-2.5 text-[13px] text-white placeholder-white/25 outline-none focus:border-[#00e5b0]/40 transition-colors';
+
+  return (
+    <>
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+        className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50" onClick={onClose} />
+      <motion.div
+        initial={{ opacity: 0, scale: 0.96, y: 10 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.96 }}
+        transition={{ duration: 0.2 }}
+        className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[440px] max-w-[92vw] bg-[#0e1c22] border border-white/[0.08] rounded-2xl z-50 overflow-hidden"
+      >
+        <div className="flex items-center justify-between px-6 py-4 border-b border-white/[0.06]">
+          <p className="text-white font-semibold text-[14px]">{initial ? 'Edit booking' : 'New booking'}</p>
+          <button onClick={onClose} className="text-white/25 hover:text-white/60 transition-colors">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.7} className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+          </button>
+        </div>
+        <div className="p-6 space-y-3.5">
+          <div>
+            <label className="text-white/30 text-[11px] mb-1 block">Patient name *</label>
+            <input className={inputCls} value={form.patient_name} onChange={field('patient_name')} placeholder="e.g. Fatima Al Mansoori" />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-white/30 text-[11px] mb-1 block">Phone</label>
+              <input className={inputCls} value={form.phone} onChange={field('phone')} placeholder="+9715XXXXXXXX" />
+            </div>
+            <div>
+              <label className="text-white/30 text-[11px] mb-1 block">Service</label>
+              <input className={inputCls} value={form.service} onChange={field('service')} placeholder="e.g. Cleaning" />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-white/30 text-[11px] mb-1 block">Date</label>
+              <input type="date" className={inputCls} value={form.date} onChange={field('date')} />
+            </div>
+            <div>
+              <label className="text-white/30 text-[11px] mb-1 block">Time</label>
+              <input type="time" className={inputCls} value={form.time} onChange={field('time')} />
+            </div>
+          </div>
+          <div>
+            <label className="text-white/30 text-[11px] mb-1 block">Status</label>
+            <select className={inputCls} value={form.status} onChange={field('status')}>
+              <option value="confirmed">Confirmed</option>
+              <option value="pending">Pending</option>
+              <option value="cancelled">Cancelled</option>
+            </select>
+          </div>
+          <div>
+            <label className="text-white/30 text-[11px] mb-1 block">Notes</label>
+            <textarea rows={2} className={inputCls + ' resize-none'} value={form.notes} onChange={field('notes')} placeholder="Optional — e.g. phoned in, prefers morning" />
+          </div>
+          {err && <p className="text-amber-400 text-[11.5px]">{err}</p>}
+        </div>
+        <div className="flex items-center justify-end gap-2 px-6 py-4 border-t border-white/[0.06]">
+          <button onClick={onClose} className="px-4 py-2 rounded-xl text-[12.5px] text-white/50 hover:text-white/80 transition-colors">Cancel</button>
+          <button
+            onClick={submit}
+            disabled={saving}
+            className="px-4 py-2 rounded-xl text-[12.5px] font-medium bg-[#00e5b0] text-[#04140f] hover:bg-[#00e5b0]/90 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            {saving ? 'Saving…' : initial ? 'Save changes' : 'Add booking'}
+          </button>
+        </div>
+      </motion.div>
+    </>
+  );
+}
+
 /* ── Detail drawer ── */
-function BookingDrawer({ booking, onClose }) {
+function BookingDrawer({ booking, onClose, onEdit, onCancel, busy }) {
   if (!booking) return null;
   const s = STATUS_STYLES[booking.status] ?? STATUS_STYLES.pending;
   const d = new Date(booking.appointment_date ?? booking.created_at);
+  const isCancelled = (booking.status || '').toLowerCase() === 'cancelled';
   return (
     <>
       <motion.div
@@ -56,21 +174,29 @@ function BookingDrawer({ booking, onClose }) {
         className="fixed right-0 top-0 h-full w-[360px] bg-[#0e1c22] border-l border-white/[0.08] z-50 flex flex-col"
       >
         <div className="flex items-center justify-between px-6 py-5 border-b border-white/[0.06]">
-          <p className="text-white font-semibold text-[14px]">{booking.name || 'Unnamed patient'}</p>
+          <p className="text-white font-semibold text-[14px]">{patientName(booking)}</p>
           <button onClick={onClose} className="text-white/25 hover:text-white/60 transition-colors">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.7} className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
           </button>
         </div>
-        <div className="p-6 space-y-4">
-          <div className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[12px] font-semibold border ${s.bg} ${s.text} ${s.border}`}>
-            <span className={`w-1.5 h-1.5 rounded-full ${s.dot}`} />
-            {booking.status || 'pending'}
+        <div className="p-6 space-y-4 flex-1 overflow-y-auto">
+          <div className="flex items-center gap-2">
+            <div className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[12px] font-semibold border ${s.bg} ${s.text} ${s.border}`}>
+              <span className={`w-1.5 h-1.5 rounded-full ${s.dot}`} />
+              {booking.status || 'pending'}
+            </div>
+            {booking.source && (
+              <span className="text-[10.5px] text-white/30 bg-white/[0.04] border border-white/[0.07] px-2 py-1 rounded-lg capitalize">
+                {booking.source === 'bot' ? '🤖 Bot' : booking.source}
+              </span>
+            )}
           </div>
           {[
             { label: 'Phone',    val: booking.phone   || '—' },
             { label: 'Service',  val: booking.service || '—' },
             { label: 'Date',     val: d.toLocaleDateString('en-AE', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }) },
             { label: 'Time',     val: d.toLocaleTimeString('en-AE', { hour: '2-digit', minute: '2-digit' }) },
+            ...(booking.notes ? [{ label: 'Notes', val: booking.notes }] : []),
           ].map(row => (
             <div key={row.label} className="flex flex-col gap-1">
               <p className="text-white/25 text-[11px]">{row.label}</p>
@@ -78,30 +204,120 @@ function BookingDrawer({ booking, onClose }) {
             </div>
           ))}
         </div>
+        <div className="flex items-center gap-2 px-6 py-4 border-t border-white/[0.06]">
+          <button
+            onClick={() => onEdit(booking)}
+            className="flex-1 px-4 py-2.5 rounded-xl text-[12.5px] font-medium bg-white/[0.05] text-white/70 border border-white/[0.08] hover:bg-white/[0.08] transition-colors"
+          >
+            Edit
+          </button>
+          {!isCancelled && (
+            <button
+              onClick={() => onCancel(booking)}
+              disabled={busy}
+              className="flex-1 px-4 py-2.5 rounded-xl text-[12.5px] font-medium bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500/20 transition-colors disabled:opacity-40"
+            >
+              {busy ? 'Cancelling…' : 'Cancel booking'}
+            </button>
+          )}
+        </div>
       </motion.div>
     </>
   );
 }
 
 export default function BookingsPage() {
+  const router = useRouter();
   const [bookings, setBookings]   = useState([]);
   const [loading, setLoading]     = useState(true);
   const [view, setView]           = useState('calendar'); // 'calendar' | 'list'
   const [weekStart, setWeekStart] = useState(() => getWeekStart(new Date()));
   const [selected, setSelected]   = useState(null);
+  const [portalClientId, setPortalClientId] = useState(null);
+  const [botClientId, setBotClientId]       = useState('');
+  const [formOpen, setFormOpen]   = useState(false);
+  const [editing, setEditing]     = useState(null);
+  const [saving, setSaving]       = useState(false);
+  const [busy, setBusy]           = useState(false);
+  const realtimeRef = useRef(null);
+
+  const fetchBookings = useCallback(async (pcid) => {
+    const { data } = await supabase
+      .from('pending_bookings')
+      .select('*')
+      .eq('client_id', pcid)
+      .order('appointment_date', { ascending: true });
+    setBookings(data || []);
+  }, []);
 
   useEffect(() => {
-    async function fetchBookings() {
-      const { data } = await supabase
-        .from('pending_bookings')
-        .select('*')
-        .eq('client_id', CLIENT_ID)
-        .order('created_at', { ascending: true });
-      setBookings(data || []);
+    async function load() {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) { router.push('/login'); return; }
+      const { data: clientRow } = await supabase
+        .from('clients')
+        .select('id, bot_client_id')
+        .eq('user_id', user.id)
+        .single();
+      if (!clientRow) { setLoading(false); return; }
+      setPortalClientId(clientRow.id);
+      setBotClientId(clientRow.bot_client_id || 'dental_demo');
+      await fetchBookings(clientRow.id);
       setLoading(false);
     }
-    fetchBookings();
-  }, []);
+    load();
+  }, [fetchBookings, router]);
+
+  // Realtime: reflect new/changed bookings (bot-made or from another device).
+  useEffect(() => {
+    if (!portalClientId) return;
+    if (realtimeRef.current) supabase.removeChannel(realtimeRef.current);
+    const ch = supabase
+      .channel('bookings-page')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'pending_bookings', filter: `client_id=eq.${portalClientId}` },
+        () => { fetchBookings(portalClientId); })
+      .subscribe();
+    realtimeRef.current = ch;
+    return () => supabase.removeChannel(ch);
+  }, [portalClientId, fetchBookings]);
+
+  async function callBooking(action, payload) {
+    const res = await fetch(`/api/rag/bookings/${action}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ client_id: botClientId || 'dental_demo', ...payload }),
+    });
+    return res.json().catch(() => ({ ok: false, error: 'Network error' }));
+  }
+
+  async function handleSubmit(form) {
+    setSaving(true);
+    try {
+      const data = editing
+        ? await callBooking('update', { booking_id: editing.id, ...form })
+        : await callBooking('create', form);
+      if (data?.ok) {
+        await fetchBookings(portalClientId);
+        if (!data.warning) { setFormOpen(false); setEditing(null); setSelected(null); }
+      }
+      return data;
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleCancel(booking) {
+    setBusy(true);
+    try {
+      const data = await callBooking('cancel', { booking_id: booking.id });
+      if (data?.ok) { await fetchBookings(portalClientId); setSelected(null); }
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function openCreate() { setEditing(null); setFormOpen(true); }
+  function openEdit(b)  { setEditing(b); setSelected(null); setFormOpen(true); }
 
   if (loading) return <TableSkeleton />;
 
@@ -112,11 +328,9 @@ export default function BookingsPage() {
     return d;
   });
 
-  /* Map bookings onto calendar slots */
   function bookingsForDay(day) {
     return bookings.filter(b => sameDay(new Date(b.appointment_date ?? b.created_at), day));
   }
-
   function hourOf(b) {
     return new Date(b.appointment_date ?? b.created_at).getHours();
   }
@@ -127,9 +341,8 @@ export default function BookingsPage() {
   const CalendarView = (
     <div className="overflow-x-auto">
       <div className="min-w-[700px]">
-        {/* Day headers */}
         <div className="grid grid-cols-[52px_repeat(7,1fr)] border-b border-white/[0.06] mb-0">
-          <div /> {/* gutter */}
+          <div />
           {weekDays.map((d, i) => {
             const isToday = sameDay(d, today);
             return (
@@ -140,8 +353,6 @@ export default function BookingsPage() {
             );
           })}
         </div>
-
-        {/* Time grid */}
         <div className="relative">
           {HOURS.map(h => (
             <div key={h} className="grid grid-cols-[52px_repeat(7,1fr)] border-b border-white/[0.04]" style={{ minHeight: 56 }}>
@@ -161,7 +372,7 @@ export default function BookingsPage() {
                           onClick={() => setSelected(b)}
                           className={`w-full text-left px-2 py-1.5 rounded-lg text-[10.5px] font-semibold border truncate transition-all hover:brightness-125 ${s.block}`}
                         >
-                          {b.name || b.phone || `#${b.id}`}
+                          {patientName(b)}
                         </motion.button>
                       );
                     })}
@@ -198,7 +409,7 @@ export default function BookingsPage() {
                 className="hover:bg-white/[0.02] transition-colors cursor-pointer"
                 onClick={() => setSelected(b)}
               >
-                <td className="px-5 py-3.5 font-medium text-white/80">{b.name || '—'}</td>
+                <td className="px-5 py-3.5 font-medium text-white/80">{patientName(b)}</td>
                 <td className="px-5 py-3.5 text-white/40">{b.phone || '—'}</td>
                 <td className="px-5 py-3.5 text-white/40">{b.service || '—'}</td>
                 <td className="px-5 py-3.5 text-white/30 tabular-nums text-[12px]">
@@ -214,7 +425,7 @@ export default function BookingsPage() {
             );
           })}
           {bookings.length === 0 && (
-            <tr><td colSpan={5} className="px-5 py-14 text-center text-white/15 text-[13px]">No bookings yet.</td></tr>
+            <tr><td colSpan={5} className="px-5 py-14 text-center text-white/15 text-[13px]">No bookings yet. Add one with “New booking”.</td></tr>
           )}
         </tbody>
       </table>
@@ -236,6 +447,15 @@ export default function BookingsPage() {
         </div>
 
         <div className="flex items-center gap-3">
+          {/* New booking */}
+          <button
+            onClick={openCreate}
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-[12.5px] font-semibold bg-[#00e5b0] text-[#04140f] hover:bg-[#00e5b0]/90 transition-colors"
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} className="w-4 h-4"><path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15"/></svg>
+            New booking
+          </button>
+
           {/* Week nav — only shown in calendar mode */}
           {view === 'calendar' && (
             <div className="flex items-center gap-2 bg-white/[0.04] border border-white/[0.07] rounded-xl px-3 py-2">
@@ -304,7 +524,29 @@ export default function BookingsPage() {
 
       {/* Drawer */}
       <AnimatePresence>
-        {selected && <BookingDrawer booking={selected} onClose={() => setSelected(null)} />}
+        {selected && (
+          <BookingDrawer
+            booking={selected}
+            onClose={() => setSelected(null)}
+            onEdit={openEdit}
+            onCancel={handleCancel}
+            busy={busy}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Create / Edit modal */}
+      <AnimatePresence>
+        {formOpen && (
+          <BookingFormModal
+            key={editing ? `edit-${editing.id}` : 'create'}
+            open={formOpen}
+            initial={editing}
+            saving={saving}
+            onClose={() => { setFormOpen(false); setEditing(null); }}
+            onSubmit={handleSubmit}
+          />
+        )}
       </AnimatePresence>
     </div>
   );

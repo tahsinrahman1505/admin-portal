@@ -4,10 +4,16 @@ import { useEffect, useState, useRef, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 
 const TYPE_META = {
-  handoff:  { icon: '🤝', color: '#f59e0b', label: 'Handoff',  desc: 'Patient needs human assistance' },
-  lead:     { icon: '🎯', color: '#60a5fa', label: 'New Lead',  desc: 'New lead captured'              },
-  booking:  { icon: '📅', color: '#00e5b0', label: 'Booking',   desc: 'Appointment confirmed'          },
-  message:  { icon: '💬', color: '#00e5b0', label: 'Message',   desc: 'New message received'           },
+  handoff:        { icon: '🤝', color: '#f59e0b', label: 'Handoff',     desc: 'Patient needs human assistance' },
+  lead:           { icon: '🎯', color: '#60a5fa', label: 'New Lead',     desc: 'New lead captured'              },
+  booking:        { icon: '📅', color: '#00e5b0', label: 'Booking',      desc: 'Appointment confirmed'          },
+  message:        { icon: '💬', color: '#00e5b0', label: 'Message',      desc: 'New message received'           },
+  // System/delivery alert — outbound message failed for a reason the team must fix
+  // (expired token, config, etc.). Emitted by the backend delivery classifier.
+  system_error:   { icon: '⚠️', color: '#ef4444', label: 'System Alert', desc: 'Delivery/system issue — needs attention' },
+  // Roadmap (Patient Rescue): mapped now so they are never mislabeled when emitted.
+  at_risk:        { icon: '🔔', color: '#f59e0b', label: 'At Risk',      desc: 'Patient may be slipping away'    },
+  low_confidence: { icon: '❓', color: '#60a5fa', label: 'Low Confidence', desc: 'Bot was unsure — review'       },
 }
 
 function timeAgo(ts) {

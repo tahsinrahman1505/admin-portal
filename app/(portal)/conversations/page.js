@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useCallback, useRef } from 'react'
+import { useEffect, useState, useCallback, useRef, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { ConversationsSkeleton } from '@/components/Skeleton'
@@ -51,6 +51,85 @@ function formatTimestamp(ts) {
   const date = new Date(ts)
   return date.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' }) +
     ', ' + date.toLocaleTimeString('en-GB', { hour: 'numeric', minute: '2-digit', hour12: true })
+}
+
+// ── Delivery receipts ─────────────────────────────────────────────────────────
+// Per-message outbound delivery status (sent / delivered / read / failed), keyed
+// by Meta's wamid in the message_delivery table. Mirrors the mobile app so the
+// portal shows the same ticks and "not delivered" reasons. Degrades silently to
+// no receipts on deployments where the table is absent.
+
+function normForMatch(s) {
+  return (s || '').slice(0, 120).toLowerCase()
+}
+
+// Match outbound (bot/owner) messages to message_delivery rows by body-preview
+// prefix (either direction) + nearest timestamp, consuming each delivery row once.
+function buildDeliveryMap(messages, deliveries) {
+  const map = new Map()
+  if (!deliveries || deliveries.length === 0) return map
+  const pool = deliveries.map(d => ({ d, used: false }))
+
+  for (const msg of messages || []) {
+    if (!msg) continue
+    // Only outbound (clinic→patient) messages carry a delivery receipt
+    if (msg.role !== 'bot' && msg.role !== 'owner') continue
+    const body = normForMatch(msg.message)
+    if (!body) continue
+    const msgTime = new Date(msg.created_at).getTime()
+
+    let best = null
+    let bestDelta = Infinity
+    for (const entry of pool) {
+      if (entry.used) continue
+      const prev = normForMatch(entry.d.body_preview)
+      if (!prev) continue
+      if (!(body.startsWith(prev) || prev.startsWith(body))) continue
+      const delta = Math.abs(new Date(entry.d.created_at).getTime() - msgTime)
+      if (delta < bestDelta) { bestDelta = delta; best = entry }
+    }
+    if (best) { best.used = true; map.set(msg.id, best.d) }
+  }
+  return map
+}
+
+function failureReason(d) {
+  const code = String(d.error_code || '')
+  if (d.lane === 'clinic') {
+    if (code === '131047') return 'Outside the 24-hour window — send an approved template to reply.'
+    if (code === '131026') return "This number can't receive WhatsApp messages."
+    if (code === '131053') return 'Media could not be delivered — try resending the attachment.'
+    return d.error_title || 'Could not be delivered to this patient.'
+  }
+  if (d.lane === 'transient') return 'Temporary delivery issue — retrying automatically.'
+  return 'Delivery issue on our side — the team has been alerted.'
+}
+
+const RECEIPT_VIEW = {
+  accepted:  { label: 'Sent',      color: 'text-white/30' },
+  sent:      { label: 'Sent',      color: 'text-white/30' },
+  delivered: { label: 'Delivered', color: 'text-white/40' },
+  read:      { label: 'Read',      color: 'text-[#00e5b0]' },
+}
+
+function DeliveryReceipt({ delivery }) {
+  if (!delivery) return null
+  if (delivery.status === 'failed') {
+    return (
+      <span className="inline-flex items-start gap-1 mt-1 text-[10px] text-red-400/90 bg-red-500/10 border border-red-500/20 px-1.5 py-0.5 rounded-md leading-snug">
+        <span className="shrink-0">⚠</span>
+        <span>Not delivered — {failureReason(delivery)}</span>
+      </span>
+    )
+  }
+  const view = RECEIPT_VIEW[delivery.status]
+  if (!view) return null
+  const tick = delivery.status === 'delivered' || delivery.status === 'read' ? '✓✓' : '✓'
+  return (
+    <span className={`inline-flex items-center gap-0.5 text-[10px] ${view.color}`}>
+      {tick} {view.label}
+    </span>
+  )
 }
 
 // ── Status badge ─────────────────────────────────────────────────────────────
@@ -121,6 +200,7 @@ export default function ConversationsPage() {
   const [summarizing, setSummarizing]   = useState(false)
 
   const [liveMessages, setLiveMessages] = useState([])
+  const [deliveries, setDeliveries]     = useState([]) // message_delivery rows for selected thread
   const bottomRef   = useRef(null)
   const realtimeRef = useRef(null)
 
@@ -279,6 +359,50 @@ export default function ConversationsPage() {
   useEffect(() => {
     if (selected) { setLiveMessages(selected.messages); setSummary(null) }
   }, [selected?.session_id]) // eslint-disable-line
+
+  // ── Load delivery receipts for the selected thread ──
+  useEffect(() => {
+    const sid = selected?.session_id
+    let cancelled = false
+    ;(async () => {
+      if (!sid) { if (!cancelled) setDeliveries([]); return }
+      const { data, error } = await supabase
+        .from('message_delivery')
+        .select('wamid,session_id,channel,status,lane,error_code,error_title,body_preview,created_at')
+        .eq('session_id', sid)
+        .order('created_at', { ascending: true })
+      if (cancelled) return
+      setDeliveries(error ? [] : (data || []))
+    })()
+    return () => { cancelled = true }
+  }, [selected?.session_id])
+
+  // ── Realtime delivery updates for the selected thread ──
+  useEffect(() => {
+    if (!selected?.session_id) return
+    const ch = supabase
+      .channel(`delivery-${selected.session_id}`)
+      .on('postgres_changes', {
+        event: '*', schema: 'public', table: 'message_delivery',
+        filter: `session_id=eq.${selected.session_id}`,
+      }, (payload) => {
+        const row = payload.new
+        if (!row) return
+        setDeliveries(prev => {
+          const idx = prev.findIndex(d => d.wamid && d.wamid === row.wamid)
+          if (idx === -1) return [...prev, row]
+          const next = [...prev]; next[idx] = row; return next
+        })
+      })
+      .subscribe()
+    return () => { supabase.removeChannel(ch) }
+  }, [selected?.session_id])
+
+  // Map each outbound message → its delivery receipt
+  const deliveryMap = useMemo(
+    () => buildDeliveryMap(liveMessages, deliveries),
+    [liveMessages, deliveries]
+  )
 
   // ── Auto-scroll ──
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [liveMessages])
@@ -562,6 +686,11 @@ export default function ConversationsPage() {
                       <p className={`text-[10.5px] mt-1.5 ${isCustomer ? 'text-white/40' : 'text-white/25'}`}>
                         {isCustomer ? 'Customer' : isOwner ? 'Owner' : 'Bot'} · {formatTimestamp(msg.created_at)}
                       </p>
+                      {!isCustomer && deliveryMap.get(msg.id) && (
+                        <div className="mt-1">
+                          <DeliveryReceipt delivery={deliveryMap.get(msg.id)} />
+                        </div>
+                      )}
                     </div>
                   </div>
                 )

@@ -258,7 +258,7 @@ export default function DashboardPage() {
   }, [loading])
 
   useEffect(() => {
-    fetch(`${process.env.NEXT_PUBLIC_API_URL}/health`)
+    fetch('/api/rag/health')
       .then(r => r.json()).then(d => setBotStatus(d.status))
       .catch(() => setBotStatus('unreachable'))
   }, [])

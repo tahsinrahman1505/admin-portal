@@ -53,6 +53,42 @@ function formatTimestamp(ts) {
     ', ' + date.toLocaleTimeString('en-GB', { hour: 'numeric', minute: '2-digit', hour12: true })
 }
 
+// ── Conversation media ───────────────────────────────────────────────────────
+// Attachments are uploaded to the public conversation-media bucket via a
+// backend-minted signed URL (the service-role key never reaches the browser),
+// then the public link is sent to the patient. 25 MB cap + mime allowlist are
+// enforced by the bucket; we mirror them here for a friendly pre-flight error.
+const MAX_MEDIA_BYTES = 25 * 1024 * 1024
+const MEDIA_CONTENT_TYPES = new Set([
+  'image/jpeg', 'image/png', 'image/gif', 'image/webp',
+  'image/heic', 'image/heif', 'image/bmp',
+  'video/mp4', 'video/quicktime', 'video/x-m4v',
+  'video/webm', 'video/3gpp', 'video/x-matroska',
+])
+const IMAGE_RE = /\.(jpe?g|png|gif|webp|heic|heif|bmp)(\?.*)?$/i
+const VIDEO_RE = /\.(mp4|mov|m4v|webm|3gp|mkv)(\?.*)?$/i
+
+function extFromName(name, fallback) {
+  const dot = (name || '').lastIndexOf('.')
+  if (dot > -1 && dot < name.length - 1) return name.slice(dot + 1).toLowerCase()
+  return fallback
+}
+
+// A media message is logged as the URL on its own (optionally followed by a
+// caption). Parse it back out so the bubble can render the image/video inline.
+function parseMediaMessage(raw) {
+  const text = (raw || '').trim()
+  const firstToken = text.split(/\s+/)[0] || ''
+  const isUrl = /^https?:\/\//i.test(firstToken)
+  if (isUrl && IMAGE_RE.test(firstToken)) {
+    return { mediaUrl: firstToken, mediaType: 'image', caption: text.slice(firstToken.length).trim() }
+  }
+  if (isUrl && VIDEO_RE.test(firstToken)) {
+    return { mediaUrl: firstToken, mediaType: 'video', caption: text.slice(firstToken.length).trim() }
+  }
+  return { mediaUrl: null, mediaType: null, caption: text }
+}
+
 // ── Delivery receipts ─────────────────────────────────────────────────────────
 // Per-message outbound delivery status (sent / delivered / read / failed), keyed
 // by Meta's wamid in the message_delivery table. Mirrors the mobile app so the
@@ -196,6 +232,7 @@ export default function ConversationsPage() {
   const [resuming, setResuming]         = useState(null)
   const [replyText, setReplyText]       = useState('')
   const [sending, setSending]           = useState(false)
+  const [attaching, setAttaching]       = useState(false)
   const [summary, setSummary]           = useState(null)
   const [summarizing, setSummarizing]   = useState(false)
 
@@ -203,6 +240,7 @@ export default function ConversationsPage() {
   const [deliveries, setDeliveries]     = useState([]) // message_delivery rows for selected thread
   const bottomRef   = useRef(null)
   const realtimeRef = useRef(null)
+  const fileInputRef = useRef(null)
 
 
   // ── Load handoff sessions ──
@@ -497,6 +535,84 @@ export default function ConversationsPage() {
     } finally { setSending(false) }
   }
 
+  // ── Attach + send media ──
+  // 1) sign a clinic-scoped upload URL, 2) PUT the binary straight to Supabase
+  // Storage with the signed token, 3) send the resulting public link to the
+  // patient. Same backend core as the mobile app, so it behaves identically.
+  async function handleAttach(file) {
+    if (!file || !selected || attaching) return
+    const threadCh = getThreadChannel(selected)
+    const norm     = normalizeIdentity(selected.sender_id || selected.phone)
+    const mimeType = file.type || ''
+    const mediaType = mimeType.startsWith('video/') ? 'video' : 'image'
+
+    if (!MEDIA_CONTENT_TYPES.has(mimeType.toLowerCase())) {
+      alert('Unsupported file type. Send an image or video.')
+      return
+    }
+    if (file.size > MAX_MEDIA_BYTES) {
+      alert('File is too large. The limit is 25 MB.')
+      return
+    }
+
+    setAttaching(true)
+    try {
+      const ext = extFromName(file.name, mediaType === 'video' ? 'mp4' : 'jpg')
+
+      // 1) Ask the backend for a signed upload URL.
+      const signRes = await fetch(`${API_URL}/media/sign-upload`, {
+        method: 'POST', headers: API_HEADERS,
+        body: JSON.stringify({
+          session_id: norm,
+          ext,
+          content_type: mimeType.toLowerCase(),
+          client_id: botClientId || 'dental_demo',
+        }),
+      })
+      if (!signRes.ok) { console.error('Sign failed:', await signRes.text()); alert('Could not prepare the upload. Please try again.'); return }
+      const signed = await signRes.json()
+
+      // 2) Upload the binary directly to Supabase Storage with the signed token.
+      const upRes = await fetch(signed.upload_url, {
+        method: 'PUT',
+        headers: { 'Content-Type': mimeType, 'cache-control': '2592000' },
+        body: file,
+      })
+      if (!upRes.ok) { console.error('Upload failed:', upRes.status); alert(`Upload failed (${upRes.status}). Please try again.`); return }
+
+      // Optimistic bubble — store as "<url> <caption>" like the backend logs it.
+      const optimisticMsg = {
+        id: `opt_${Date.now()}`, session_id: selected.session_id,
+        phone_number: selected.phone, role: 'owner', message: signed.public_url,
+        session_status: 'Handed Off', created_at: new Date().toISOString(),
+      }
+      setLiveMessages(prev => [...prev, optimisticMsg])
+
+      // 3) Send the public link to the patient via the channel.
+      const sendRes = await fetch(`${API_URL}/session/send-media`, {
+        method: 'POST', headers: API_HEADERS,
+        body: JSON.stringify({
+          session_id: norm,
+          media_url:  signed.public_url,
+          media_type: mediaType,
+          caption:    '',
+          client_id:  botClientId || 'dental_demo',
+          channel:    threadCh,
+        }),
+      })
+      if (!sendRes.ok) {
+        setLiveMessages(prev => prev.filter(m => m.id !== optimisticMsg.id))
+        console.error('Send-media failed:', await sendRes.text())
+        alert('The file uploaded but could not be sent. Please try again.')
+      }
+    } catch (e) {
+      console.error('Attach error:', e)
+      alert('Something went wrong sending the attachment.')
+    } finally {
+      setAttaching(false)
+    }
+  }
+
   // ── Channel counts for tabs ──
   const channelCounts = threads.reduce((acc, t) => {
     const ch = t.channel || 'whatsapp'
@@ -682,7 +798,27 @@ export default function ConversationsPage() {
                           via {CHANNEL_META[msgChannel]?.label || msgChannel}
                         </p>
                       )}
-                      <p className="text-[13px] leading-relaxed whitespace-pre-wrap">{msg.message}</p>
+                      {(() => {
+                        const media = parseMediaMessage(msg.message)
+                        if (media.mediaUrl) {
+                          return (
+                            <div className="space-y-1.5">
+                              {media.mediaType === 'video' ? (
+                                <video src={media.mediaUrl} controls className="rounded-lg max-w-full max-h-72" />
+                              ) : (
+                                <a href={media.mediaUrl} target="_blank" rel="noopener noreferrer">
+                                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                                  <img src={media.mediaUrl} alt="attachment" className="rounded-lg max-w-full max-h-72 object-cover" />
+                                </a>
+                              )}
+                              {media.caption && (
+                                <p className="text-[13px] leading-relaxed whitespace-pre-wrap">{media.caption}</p>
+                              )}
+                            </div>
+                          )
+                        }
+                        return <p className="text-[13px] leading-relaxed whitespace-pre-wrap">{msg.message}</p>
+                      })()}
                       <p className={`text-[10.5px] mt-1.5 ${isCustomer ? 'text-white/40' : 'text-white/25'}`}>
                         {isCustomer ? 'Customer' : isOwner ? 'Owner' : 'Bot'} · {formatTimestamp(msg.created_at)}
                       </p>
@@ -711,6 +847,34 @@ export default function ConversationsPage() {
             {selectedHandedOff && (
               <div className="shrink-0 border-t border-white/[0.06] bg-white/[0.02] px-4 py-3">
                 <div className="flex items-end gap-2">
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*,video/*"
+                    className="hidden"
+                    onChange={e => {
+                      const f = e.target.files?.[0]
+                      e.target.value = '' // allow re-selecting the same file
+                      if (f) handleAttach(f)
+                    }}
+                  />
+                  <button
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={attaching || sending}
+                    title="Attach image or video"
+                    className="shrink-0 w-10 h-10 flex items-center justify-center rounded-xl
+                               bg-white/[0.05] text-white/50 border border-white/[0.08]
+                               hover:bg-white/[0.08] hover:text-white/80 transition-colors
+                               disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    {attaching ? (
+                      <span className="w-4 h-4 border border-white/40 border-t-white rounded-full animate-spin inline-block" />
+                    ) : (
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="w-5 h-5">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M18.375 12.739l-7.693 7.693a4.5 4.5 0 01-6.364-6.364l10.94-10.94A3 3 0 1119.5 7.372L8.552 18.32m.009-.01l-.01.01m5.699-9.941l-7.81 7.81a1.5 1.5 0 002.112 2.13" />
+                      </svg>
+                    )}
+                  </button>
                   <textarea
                     value={replyText}
                     onChange={e => setReplyText(e.target.value)}
@@ -734,7 +898,7 @@ export default function ConversationsPage() {
                   </button>
                 </div>
                 <p className="text-[10.5px] text-white/20 mt-1.5 px-1">
-                  {channelMeta.icon} Replies go back on {channelMeta.label} · Resume Bot to hand back to AI
+                  {channelMeta.icon} Replies go back on {channelMeta.label} · 📎 attach an image or video · Resume Bot to hand back to AI
                 </p>
               </div>
             )}

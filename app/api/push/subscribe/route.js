@@ -1,9 +1,12 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
 
+// Server-only route: no logged-in user session here, so the public anon key
+// would be RLS-blocked. Use the service-role key (kept server-side, never
+// NEXT_PUBLIC_ so it is not bundled into the browser).
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  process.env.SUPABASE_SERVICE_ROLE_KEY
 )
 
 export async function POST(req) {

@@ -78,11 +78,15 @@ export default function PortalLayout({ children }) {
       if (clientRow) setClientId(clientRow.id)
     })
 
-    // Keep the sb-portal-session cookie in sync with Supabase token refreshes.
+    // Keep the sb-portal-session cookie in sync with the Supabase session.
     // supabase-js silently refreshes the access token before it expires — we
     // mirror the new token into the cookie so Edge middleware stays valid.
+    // INITIAL_SESSION is critical: it fires when supabase restores a session
+    // from localStorage on page load. Without it, a lapsed cookie is never
+    // re-written, so the next navigation hits middleware with no cookie and
+    // gets bounced to /login even though the user is still authenticated.
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if ((event === 'TOKEN_REFRESHED' || event === 'SIGNED_IN') && session?.access_token) {
+      if ((event === 'INITIAL_SESSION' || event === 'TOKEN_REFRESHED' || event === 'SIGNED_IN') && session?.access_token) {
         document.cookie = `sb-portal-session=${session.access_token}; path=/; max-age=3600; SameSite=Lax; Secure`
       }
       if (event === 'SIGNED_OUT') {

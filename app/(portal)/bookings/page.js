@@ -11,6 +11,26 @@ const STATUS_STYLES = {
   cancelled: { bg: 'bg-red-500/[0.08]',   text: 'text-red-400',    border: 'border-red-500/15',   dot: 'bg-red-400',   block: 'bg-red-500/12 border-red-500/20 text-red-400' },
 };
 
+// No-show risk buckets — color-coded, explainable. Scores come from the
+// read-only /bookings/risk endpoint (rules-based scorer on the RAG server).
+const RISK_STYLES = {
+  high:    { bg: 'bg-red-500/[0.12]',   text: 'text-red-300',    border: 'border-red-500/25',    dot: 'bg-red-400',    label: 'High' },
+  medium:  { bg: 'bg-amber-500/[0.1]',  text: 'text-amber-300',  border: 'border-amber-500/20',  dot: 'bg-amber-400',  label: 'Medium' },
+  low:     { bg: 'bg-[#00e5b0]/[0.1]',  text: 'text-[#00e5b0]',  border: 'border-[#00e5b0]/20',  dot: 'bg-[#00e5b0]',  label: 'Low' },
+  unknown: { bg: 'bg-white/[0.04]',     text: 'text-white/40',   border: 'border-white/[0.08]',  dot: 'bg-white/30',   label: 'N/A' },
+};
+
+function RiskBadge({ risk }) {
+  if (!risk) return <span className="text-white/15 text-[12px]">—</span>;
+  const r = RISK_STYLES[risk.bucket] ?? RISK_STYLES.unknown;
+  return (
+    <span className={`inline-flex items-center gap-1.5 text-[11.5px] font-semibold px-2.5 py-1 rounded-lg border ${r.bg} ${r.text} ${r.border}`}>
+      <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${r.dot}`} />
+      {r.label}{risk.bucket !== 'unknown' ? ` · ${risk.score}` : ''}
+    </span>
+  );
+}
+
 const HOURS = Array.from({ length: 11 }, (_, i) => i + 8); // 8am–6pm
 const DAYS  = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
@@ -156,7 +176,7 @@ function BookingFormModal({ open, onClose, onSubmit, initial, saving }) {
 }
 
 /* ── Detail drawer ── */
-function BookingDrawer({ booking, onClose, onEdit, onCancel, busy }) {
+function BookingDrawer({ booking, risk, onClose, onEdit, onCancel, busy }) {
   if (!booking) return null;
   const s = STATUS_STYLES[booking.status] ?? STATUS_STYLES.pending;
   const d = new Date(booking.appointment_date ?? booking.created_at);
@@ -203,6 +223,24 @@ function BookingDrawer({ booking, onClose, onEdit, onCancel, busy }) {
               <p className="text-white/70 text-[13px]">{row.val}</p>
             </div>
           ))}
+          {risk && risk.bucket !== 'unknown' && (
+            <div className="pt-2 border-t border-white/[0.06] flex flex-col gap-2">
+              <div className="flex items-center justify-between">
+                <p className="text-white/25 text-[11px]">No-show risk</p>
+                <RiskBadge risk={risk} />
+              </div>
+              {risk.factors?.length > 0 && (
+                <ul className="flex flex-col gap-1.5 mt-0.5">
+                  {risk.factors.map((f, idx) => (
+                    <li key={idx} className="flex items-start gap-2 text-[12px] text-white/55">
+                      <span className="text-white/30 tabular-nums shrink-0">+{f.points}</span>
+                      <span>{f.detail}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
         </div>
         <div className="flex items-center gap-2 px-6 py-4 border-t border-white/[0.06]">
           <button
@@ -235,6 +273,7 @@ export default function BookingsPage() {
   const [selected, setSelected]   = useState(null);
   const [portalClientId, setPortalClientId] = useState(null);
   const [botClientId, setBotClientId]       = useState('');
+  const [riskMap, setRiskMap]               = useState({}); // booking.id -> {score,bucket,factors}
   const [formOpen, setFormOpen]   = useState(false);
   const [editing, setEditing]     = useState(null);
   const [saving, setSaving]       = useState(false);
@@ -248,6 +287,18 @@ export default function BookingsPage() {
       .eq('client_id', pcid)
       .order('appointment_date', { ascending: true });
     setBookings(data || []);
+  }, []);
+
+  // No-show risk is computed server-side (read-only); merge it in by booking id.
+  // Best-effort: a risk-fetch failure never blocks the bookings table.
+  const fetchRisk = useCallback(async (botCid) => {
+    try {
+      const res = await fetch(`/api/rag/bookings/risk?client_id=${encodeURIComponent(botCid || 'dental_demo')}`);
+      const data = await res.json();
+      if (data?.ok && Array.isArray(data.bookings)) {
+        setRiskMap(Object.fromEntries(data.bookings.map((b) => [b.id, b.risk])));
+      }
+    } catch { /* ignore — table still renders without risk */ }
   }, []);
 
   useEffect(() => {
@@ -264,9 +315,10 @@ export default function BookingsPage() {
       setBotClientId(clientRow.bot_client_id || 'dental_demo');
       await fetchBookings(clientRow.id);
       setLoading(false);
+      fetchRisk(clientRow.bot_client_id || 'dental_demo');
     }
     load();
-  }, [fetchBookings, router]);
+  }, [fetchBookings, fetchRisk, router]);
 
   // Realtime: reflect new/changed bookings (bot-made or from another device).
   useEffect(() => {
@@ -275,11 +327,11 @@ export default function BookingsPage() {
     const ch = supabase
       .channel('bookings-page')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'pending_bookings', filter: `client_id=eq.${portalClientId}` },
-        () => { fetchBookings(portalClientId); })
+        () => { fetchBookings(portalClientId); fetchRisk(botClientId); })
       .subscribe();
     realtimeRef.current = ch;
     return () => supabase.removeChannel(ch);
-  }, [portalClientId, fetchBookings]);
+  }, [portalClientId, botClientId, fetchBookings, fetchRisk]);
 
   async function callBooking(action, payload) {
     const res = await fetch(`/api/rag/bookings/${action}`, {
@@ -392,7 +444,7 @@ export default function BookingsPage() {
       <table className="w-full text-[13px]">
         <thead className="border-b border-white/[0.07]">
           <tr>
-            {['Name', 'Phone', 'Service', 'Date', 'Status'].map(h => (
+            {['Name', 'Phone', 'Service', 'Date', 'Risk', 'Status'].map(h => (
               <th key={h} className="px-5 py-3.5 text-left text-[10.5px] font-semibold text-white/25 uppercase tracking-wider">{h}</th>
             ))}
           </tr>
@@ -415,6 +467,7 @@ export default function BookingsPage() {
                 <td className="px-5 py-3.5 text-white/30 tabular-nums text-[12px]">
                   {new Date(b.appointment_date ?? b.created_at).toLocaleDateString('en-AE', { day: 'numeric', month: 'short', year: 'numeric' })}
                 </td>
+                <td className="px-5 py-3.5"><RiskBadge risk={riskMap[b.id]} /></td>
                 <td className="px-5 py-3.5">
                   <span className={`inline-flex items-center gap-1.5 text-[11.5px] font-semibold px-2.5 py-1 rounded-lg border ${s.bg} ${s.text} ${s.border}`}>
                     <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${s.dot}`} />
@@ -425,7 +478,7 @@ export default function BookingsPage() {
             );
           })}
           {bookings.length === 0 && (
-            <tr><td colSpan={5} className="px-5 py-14 text-center text-white/15 text-[13px]">No bookings yet. Add one with “New booking”.</td></tr>
+            <tr><td colSpan={6} className="px-5 py-14 text-center text-white/15 text-[13px]">No bookings yet. Add one with “New booking”.</td></tr>
           )}
         </tbody>
       </table>
@@ -527,6 +580,7 @@ export default function BookingsPage() {
         {selected && (
           <BookingDrawer
             booking={selected}
+            risk={riskMap[selected.id]}
             onClose={() => setSelected(null)}
             onEdit={openEdit}
             onCancel={handleCancel}

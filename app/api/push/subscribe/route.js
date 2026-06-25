@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
+import { getAuthedUser, unauthorized } from '@/lib/auth'
 
 // Server-only route: no logged-in user session here, so the public anon key
 // would be RLS-blocked. Use the service-role key (kept server-side, never
@@ -10,6 +11,8 @@ const supabase = createClient(
 )
 
 export async function POST(req) {
+  const auth = await getAuthedUser(req)
+  if (!auth) return unauthorized()
   try {
     const { subscription, client_id } = await req.json()
     if (!subscription || !client_id) {
@@ -30,6 +33,8 @@ export async function POST(req) {
 }
 
 export async function DELETE(req) {
+  const auth = await getAuthedUser(req)
+  if (!auth) return unauthorized()
   try {
     const { endpoint } = await req.json()
     if (endpoint) {

@@ -13,15 +13,30 @@
 import { NextResponse } from 'next/server'
 
 /**
- * Validate that a value looks like a real Supabase JWT (3 base64 parts).
- * This prevents the trivial bypass of setting the cookie to any static string.
- * Full cryptographic verification requires @supabase/ssr — this is a fast
- * structural check that rejects forgeries without the actual token.
+ * Coarse pre-filter: the cookie must be a structurally valid JWT whose payload
+ * decodes and carries a FUTURE expiry. This rejects the trivial forgery (a static
+ * "eyJ.eyJ.x" string won't decode to JSON with a numeric exp) and expired tokens,
+ * so unauthenticated/stale requests are bounced to /login at the edge.
+ *
+ * This is NOT the authoritative auth check — it does not verify the signature
+ * (middleware carries no secret). Every privileged /api route independently does
+ * the cryptographic check via getAuthedUser() → supabase.auth.getUser(). A token
+ * that is forged but crafted to carry a future exp would pass here yet still be
+ * rejected at the route, so no privileged action can occur without a real token.
  */
-function isValidJwt(value) {
+function isLiveSession(value) {
   if (!value || !value.startsWith('eyJ')) return false
   const parts = value.split('.')
-  return parts.length === 3 && parts.every(p => p.length > 0)
+  if (parts.length !== 3 || !parts.every(p => p.length > 0)) return false
+  try {
+    let b64 = parts[1].replace(/-/g, '+').replace(/_/g, '/')
+    b64 += '='.repeat((4 - (b64.length % 4)) % 4)
+    const payload = JSON.parse(atob(b64))
+    if (typeof payload.exp !== 'number') return false
+    return payload.exp * 1000 > Date.now()
+  } catch {
+    return false
+  }
 }
 
 export function middleware(request) {
@@ -47,7 +62,7 @@ export function middleware(request) {
   // Set at login by login/page.js and refreshed by layout.js onAuthStateChange.
   const cookies = request.cookies
   const sessionToken = cookies.get('sb-portal-session')?.value
-  const hasSession = isValidJwt(sessionToken)
+  const hasSession = isLiveSession(sessionToken)
 
   if (!hasSession) {
     const loginUrl = new URL('/login', request.url)

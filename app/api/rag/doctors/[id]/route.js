@@ -5,12 +5,15 @@
  * client_id is required by the backend ownership check (C7).
  */
 import { NextResponse } from 'next/server'
+import { getAuthedUser, unauthorized } from '@/lib/auth'
 
 const RAG_URL    = process.env.NEXT_PUBLIC_API_URL || 'https://n8n.mdtahsinrahman.com/api'
 const API_SECRET = process.env.RAG_API_SECRET || ''
 const CLIENT_ID  = process.env.NEXT_PUBLIC_CLIENT_ID || 'dental_demo'
 
 export async function PUT(request, { params }) {
+  const auth = await getAuthedUser(request)
+  if (!auth) return unauthorized()
   try {
     const { id } = await params
     const { searchParams } = new URL(request.url)
@@ -32,6 +35,8 @@ export async function PUT(request, { params }) {
 }
 
 export async function DELETE(request, { params }) {
+  const auth = await getAuthedUser(request)
+  if (!auth) return unauthorized()
   try {
     const { id } = await params
     const { searchParams } = new URL(request.url)

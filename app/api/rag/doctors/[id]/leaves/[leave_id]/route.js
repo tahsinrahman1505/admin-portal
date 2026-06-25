@@ -3,12 +3,15 @@
  *   DELETE /doctors/:id/leaves/:leave_id?client_id=X  — remove a leave (ownership verified)
  */
 import { NextResponse } from 'next/server'
+import { getAuthedUser, unauthorized } from '@/lib/auth'
 
 const RAG_URL    = process.env.NEXT_PUBLIC_API_URL || 'https://n8n.mdtahsinrahman.com/api'
 const API_SECRET = process.env.RAG_API_SECRET || ''
 const CLIENT_ID  = process.env.NEXT_PUBLIC_CLIENT_ID || 'dental_demo'
 
 export async function DELETE(request, { params }) {
+  const auth = await getAuthedUser(request)
+  if (!auth) return unauthorized()
   try {
     const { id, leave_id } = await params
     const { searchParams } = new URL(request.url)

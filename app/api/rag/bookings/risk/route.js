@@ -6,14 +6,19 @@
  * out of the browser bundle. Returns { ok, count, summary, bookings:[{...,risk}] }.
  */
 import { NextResponse } from 'next/server'
+import { getAuthedUser, unauthorized, enforceTenant } from '@/lib/auth'
 
 const RAG_URL    = process.env.NEXT_PUBLIC_API_URL || 'https://n8n.mdtahsinrahman.com/api'
 const API_SECRET = process.env.RAG_API_SECRET || ''
 
 export async function GET(request) {
+  const auth = await getAuthedUser(request)
+  if (!auth) return unauthorized()
   try {
     const { searchParams } = new URL(request.url)
     const client_id = searchParams.get('client_id') || 'dental_demo'
+    const denied = enforceTenant(auth, client_id)
+    if (denied) return denied
     const res = await fetch(
       `${RAG_URL}/bookings/risk?client_id=${encodeURIComponent(client_id)}`,
       { headers: { 'x-api-key': API_SECRET }, cache: 'no-store' },

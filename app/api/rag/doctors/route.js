@@ -5,14 +5,19 @@
  * Keeps RAG_API_SECRET out of the browser bundle.
  */
 import { NextResponse } from 'next/server'
+import { getAuthedUser, unauthorized, enforceTenant } from '@/lib/auth'
 
 const RAG_URL    = process.env.NEXT_PUBLIC_API_URL || 'https://n8n.mdtahsinrahman.com/api'
 const API_SECRET = process.env.RAG_API_SECRET || ''
 
 export async function GET(request) {
+  const auth = await getAuthedUser(request)
+  if (!auth) return unauthorized()
   try {
     const { searchParams } = new URL(request.url)
     const client_id = searchParams.get('client_id') || 'dental_demo'
+    const denied = enforceTenant(auth, client_id)
+    if (denied) return denied
     const res = await fetch(`${RAG_URL}/doctors?client_id=${encodeURIComponent(client_id)}`, {
       headers: { 'x-api-key': API_SECRET },
     })
@@ -24,6 +29,8 @@ export async function GET(request) {
 }
 
 export async function POST(request) {
+  const auth = await getAuthedUser(request)
+  if (!auth) return unauthorized()
   try {
     const body = await request.json()
     const res = await fetch(`${RAG_URL}/doctors`, {

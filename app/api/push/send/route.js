@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js'
 import webpush from 'web-push'
 import { NextResponse } from 'next/server'
+import { getAuthedUser, unauthorized, enforceTenant } from '@/lib/auth'
 
 // Server-only route: no logged-in user session here, so the public anon key
 // would be RLS-blocked. Use the service-role key (kept server-side, never
@@ -17,9 +18,15 @@ webpush.setVapidDetails(
 )
 
 export async function POST(req) {
+  const auth = await getAuthedUser(req)
+  if (!auth) return unauthorized()
   try {
     const { client_id, title, body, url, urgent, tag } = await req.json()
     if (!client_id) return NextResponse.json({ error: 'Missing client_id' }, { status: 400 })
+    // Tenant guard: a clinic user may only push to their own subscribers (prevents
+    // cross-tenant phishing pushes). enforceTenant compares against the caller's clinic.
+    const denied = enforceTenant(auth, client_id)
+    if (denied) return denied
 
     // Fetch all push subscriptions for this client
     const { data: subs } = await supabase

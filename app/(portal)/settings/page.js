@@ -21,6 +21,8 @@ export default function SettingsPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [gcalMsg, setGcalMsg] = useState(null);
+  const [gcalBusy, setGcalBusy] = useState(false);
 
   useEffect(() => {
     async function load() {
@@ -30,6 +32,33 @@ export default function SettingsPage() {
     }
     load();
   }, []);
+
+  // Surface the Google Calendar connect result after the OAuth redirect, then
+  // clean the query string so a refresh doesn't re-show it.
+  useEffect(() => {
+    const p = new URLSearchParams(window.location.search);
+    const g = p.get('gcal');
+    if (g === 'connected') {
+      setGcalMsg({ ok: true, text: `Google Calendar connected${p.get('email') ? ' — ' + p.get('email') : ''}.` });
+    } else if (g === 'error') {
+      setGcalMsg({ ok: false, text: `Couldn't connect Google Calendar (${p.get('reason') || 'unknown'}). Please try again.` });
+    }
+    if (g) window.history.replaceState({}, '', '/settings');
+  }, []);
+
+  async function handleDisconnect() {
+    if (!confirm('Disconnect Google Calendar? The bot will stop booking into it.')) return;
+    setGcalBusy(true);
+    try {
+      await fetch('/api/google/disconnect', { method: 'POST' });
+      setConfig(prev => ({ ...prev, google_email: null, google_refresh_token: null }));
+      setGcalMsg({ ok: true, text: 'Google Calendar disconnected.' });
+    } catch {
+      setGcalMsg({ ok: false, text: 'Disconnect failed. Please try again.' });
+    } finally {
+      setGcalBusy(false);
+    }
+  }
 
   async function handleSave() {
     setSaving(true);
@@ -100,6 +129,41 @@ export default function SettingsPage() {
               </button>
             </div>
           ))}
+        </div>
+
+        {/* Google Calendar connect */}
+        <div className="bg-white/[0.02] border border-white/[0.07] rounded-2xl px-5 py-4">
+          <div className="flex items-center justify-between gap-4">
+            <div className="min-w-0">
+              <p className="text-[13.5px] font-medium text-white/80">Google Calendar</p>
+              <p className="text-[12px] text-white/30 mt-0.5 truncate">
+                {config.google_email
+                  ? <>Connected as <span className="text-[#00e5b0]">{config.google_email}</span></>
+                  : 'Connect so the bot books into your real calendar — and never double-books.'}
+              </p>
+            </div>
+            {config.google_email ? (
+              <button
+                onClick={handleDisconnect}
+                disabled={gcalBusy}
+                className="shrink-0 px-4 py-2 text-[12.5px] font-semibold rounded-xl border border-white/[0.12] text-white/60 hover:text-white hover:border-white/25 transition disabled:opacity-50"
+              >
+                {gcalBusy ? '…' : 'Disconnect'}
+              </button>
+            ) : (
+              <a
+                href="/api/google/start"
+                className="shrink-0 px-4 py-2 text-[12.5px] font-bold rounded-xl bg-[#00e5b0] text-[#080808] hover:brightness-110 active:scale-[0.98] transition whitespace-nowrap"
+              >
+                Connect Google Calendar
+              </a>
+            )}
+          </div>
+          {gcalMsg && (
+            <p className={`mt-3 text-[12px] ${gcalMsg.ok ? 'text-[#00e5b0]' : 'text-amber-300/80'}`}>
+              {gcalMsg.text}
+            </p>
+          )}
         </div>
 
         {/* Save */}

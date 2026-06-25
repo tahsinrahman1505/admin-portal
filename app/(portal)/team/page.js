@@ -41,6 +41,13 @@ function DoctorCard({ doctor, onEdit, onManage, onDeactivate }) {
         </div>
       </div>
       <div className="flex items-center gap-2 shrink-0">
+        <a
+          href={`/api/google/start?doctor_id=${doctor.id}`}
+          title={doctor.google_email ? `Connected: ${doctor.google_email}` : "Connect this doctor's Google Calendar"}
+          className={`${btnCls} ${doctor.google_email ? 'bg-[#00e5b0]/10 text-[#00e5b0] hover:bg-[#00e5b0]/20' : 'bg-white/[0.06] text-white/60 hover:bg-white/[0.1]'}`}
+        >
+          {doctor.google_email ? 'Calendar ✓' : 'Connect calendar'}
+        </a>
         <button onClick={() => onManage(doctor)} className={`${btnCls} bg-[#00e5b0]/10 text-[#00e5b0] hover:bg-[#00e5b0]/20`}>Schedule & Leaves</button>
         <button onClick={() => onEdit(doctor)}   className={`${btnCls} bg-white/[0.06] text-white/60 hover:bg-white/[0.1]`}>Edit</button>
         {doctor.is_active && (

@@ -34,7 +34,10 @@ export function middleware(request) {
   const isPublic =
     pathname === '/login' ||
     pathname.startsWith('/_next') ||
-    pathname.startsWith('/favicon')
+    pathname.startsWith('/favicon') ||
+    // Google redirects here cross-site after consent, so the session cookie may
+    // not ride along. The route is instead protected by the OAuth state nonce.
+    pathname === '/api/google/callback'
 
   if (isPublic) {
     return NextResponse.next()

@@ -1,0 +1,35 @@
+#!/usr/bin/env bash
+# Blocks direct `git push` to main/staging from this machine.
+#
+# Why: private repos on this account can't get GitHub-enforced branch
+# protection without a GitHub Pro upgrade (confirmed via API — both classic
+# protection and Rulesets return 403 "Upgrade to GitHub Pro" for private repos
+# on a personal account). This hook is the free stand-in: it protects against
+# the "oops, forgot I was on main" mistake from THIS machine. It is not a
+# server-side guarantee — a fresh clone or another machine won't have it
+# unless `git config core.hooksPath .githooks` is run there too.
+#
+# To get code into a protected branch: push your feature/dev/staging branch,
+# then open a PR into main on GitHub and merge it there (that path never goes
+# through this hook, since the merge happens server-side).
+#
+# Emergency override: ALLOW_PROTECTED_PUSH=1 git push ...
+
+protected_branches="main staging"
+
+while read -r local_ref local_sha remote_ref remote_sha; do
+  branch=$(echo "$remote_ref" | sed 's,refs/heads/,,')
+  for p in $protected_branches; do
+    if [ "$branch" = "$p" ]; then
+      if [ "${ALLOW_PROTECTED_PUSH:-0}" = "1" ]; then
+        echo "⚠️  ALLOW_PROTECTED_PUSH=1 set — allowing direct push to '$branch'."
+        continue
+      fi
+      echo "❌ Direct push to '$branch' is blocked by .githooks/pre-push."
+      echo "   Push your branch and open a PR into $branch on GitHub instead."
+      echo "   Emergency override: ALLOW_PROTECTED_PUSH=1 git push ..."
+      exit 1
+    fi
+  done
+done
+exit 0

@@ -11,16 +11,24 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY
 )
 
-webpush.setVapidDetails(
-  process.env.VAPID_EMAIL,
-  process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY,
-  process.env.VAPID_PRIVATE_KEY
-)
-
 export async function POST(req) {
   const auth = await getAuthedUser(req)
   if (!auth) return unauthorized()
   try {
+    // Configuring web-push at module scope means a missing/misconfigured VAPID
+    // env var in ANY environment (e.g. Preview, where it may not be set) throws
+    // during Next.js's build-time page-data collection and fails the whole
+    // build — not just this route. Configure it lazily, inside the handler,
+    // so that only fails at request time if it's actually missing.
+    if (!process.env.VAPID_EMAIL || !process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || !process.env.VAPID_PRIVATE_KEY) {
+      return NextResponse.json({ error: 'Push notifications not configured' }, { status: 503 })
+    }
+    webpush.setVapidDetails(
+      process.env.VAPID_EMAIL,
+      process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY,
+      process.env.VAPID_PRIVATE_KEY
+    )
+
     const { client_id, title, body, url, urgent, tag } = await req.json()
     if (!client_id) return NextResponse.json({ error: 'Missing client_id' }, { status: 400 })
     // Tenant guard: a clinic user may only push to their own subscribers (prevents

@@ -1,20 +1,12 @@
 'use client'
 
 import Link from 'next/link'
-import { useState } from 'react'
+import MobileApp from '@/components/MobileApp'
 
-// Phone-framed view of the clinic-owner companion app. In this showcase build we
-// frame the live inbox (the app's core surface — conversations + human takeover)
-// at phone width, so judges see the real screens with no install. Spec option (b).
-const SCREENS = [
-  { href: '/conversations', label: 'Inbox' },
-  { href: '/dashboard', label: 'Dashboard' },
-  { href: '/bookings', label: 'Bookings' },
-]
-
+// The clinic-owner companion app (products/mobile), reproduced as a web mobile
+// experience for the zero-login judge demo — same screens & design system, seed
+// data only, no backend. Rendered inside a phone frame.
 export default function MobilePreview() {
-  const [screen, setScreen] = useState(SCREENS[0].href)
-
   return (
     <main className="relative min-h-screen overflow-hidden">
       <div className="pointer-events-none absolute left-1/2 top-[-10%] h-[420px] w-[720px] -translate-x-1/2 rounded-full bg-[#00e5b0]/[0.06] blur-[130px]" />
@@ -30,38 +22,18 @@ export default function MobilePreview() {
         </div>
 
         <div className="mt-6 text-center">
-          <h1 className="text-[1.6rem] font-extrabold tracking-tight text-white">The clinic on your phone</h1>
+          <h1 className="text-[1.6rem] font-extrabold tracking-tight text-white">The clinic in your pocket</h1>
           <p className="mt-2 max-w-md text-[13.5px] text-white/50">
-            Live inbox, one-tap human takeover of any AI conversation, and push alerts when a patient needs you.
+            The real companion app — tap through Home, Inbox, Calendar and Patients. Open any conversation and use one-tap human takeover. No install, seeded data.
           </p>
-        </div>
-
-        {/* screen switcher */}
-        <div className="mt-6 inline-flex gap-1 rounded-full border border-white/10 bg-white/[0.03] p-1">
-          {SCREENS.map((s) => (
-            <button
-              key={s.href}
-              onClick={() => setScreen(s.href)}
-              className={`rounded-full px-4 py-1.5 text-[12.5px] font-medium transition-colors ${
-                screen === s.href ? 'bg-[#00e5b0] text-[#062018]' : 'text-white/50 hover:text-white/80'
-              }`}
-            >
-              {s.label}
-            </button>
-          ))}
         </div>
 
         {/* phone frame */}
         <div className="mt-8 mb-10">
-          <div className="relative rounded-[2.5rem] border-[10px] border-[#1a1a1a] bg-[#1a1a1a] shadow-[0_30px_80px_rgba(0,0,0,0.6)]">
-            <div className="absolute left-1/2 top-2.5 z-10 h-5 w-28 -translate-x-1/2 rounded-full bg-[#1a1a1a]" />
-            <div className="overflow-hidden rounded-[1.9rem] bg-[#080808]" style={{ width: 380, height: 800 }}>
-              <iframe
-                key={screen}
-                src={screen}
-                title="Tahsin.ai companion app"
-                className="h-full w-full border-0"
-              />
+          <div className="relative rounded-[2.6rem] border-[11px] border-[#161616] bg-[#161616] shadow-[0_30px_80px_rgba(0,0,0,0.65)]">
+            <div className="absolute left-1/2 top-2.5 z-10 h-5 w-28 -translate-x-1/2 rounded-full bg-[#161616]" />
+            <div className="overflow-hidden rounded-[1.95rem] bg-black" style={{ width: 384, height: 812 }}>
+              <MobileApp />
             </div>
           </div>
         </div>

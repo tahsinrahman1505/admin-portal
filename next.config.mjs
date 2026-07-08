@@ -12,6 +12,12 @@ const nextConfig = {
 
   // ── Security headers — applied to every response [F1] ──────────────────
   async headers() {
+    // Demo build frames its own pages (the /mobile phone view iframes the inbox),
+    // so it needs same-origin framing. Production stays fully locked (DENY / 'none')
+    // to prevent clickjacking of the real admin portal. Gated by NEXT_PUBLIC_DEMO_MODE.
+    const isDemo = process.env.NEXT_PUBLIC_DEMO_MODE === 'true'
+    const frameAncestors = isDemo ? "frame-ancestors 'self'" : "frame-ancestors 'none'"
+    const xFrameOptions = isDemo ? 'SAMEORIGIN' : 'DENY'
     return [
       {
         source: '/(.*)',
@@ -27,7 +33,7 @@ const nextConfig = {
               "img-src 'self' data: blob:",
               "font-src 'self' data:",
               "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://n8n.mdtahsinrahman.com",
-              "frame-ancestors 'none'",
+              frameAncestors,
               "base-uri 'self'",
               "form-action 'self'",
             ].join('; '),
@@ -46,7 +52,7 @@ const nextConfig = {
           },
           {
             key: 'X-Frame-Options',
-            value: 'DENY',
+            value: xFrameOptions,
           },
         ],
       },

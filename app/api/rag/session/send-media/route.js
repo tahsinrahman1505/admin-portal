@@ -5,11 +5,14 @@
  */
 import { NextResponse } from 'next/server'
 import { getAuthedUser, unauthorized } from '@/lib/auth'
+import { demoGuard } from '@/lib/demoRoute'
 
 const RAG_URL    = process.env.NEXT_PUBLIC_API_URL || 'https://n8n.mdtahsinrahman.com/api'
 const API_SECRET = process.env.RAG_API_SECRET || ''
 
 export async function POST(request) {
+  const _demo = demoGuard(request)
+  if (_demo) return _demo
   const auth = await getAuthedUser(request)
   if (!auth) return unauthorized()
   try {

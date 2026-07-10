@@ -16,7 +16,7 @@ export async function GET(request, { params }) {
   try {
     const { id } = await params
     const { searchParams } = new URL(request.url)
-    const client_id = searchParams.get('client_id') || CLIENT_ID
+    const client_id = auth?.botClientId || searchParams.get('client_id') || CLIENT_ID
     const denied = enforceTenant(auth, client_id)
     if (denied) return denied
     const res = await fetch(
@@ -36,7 +36,7 @@ export async function PUT(request, { params }) {
   try {
     const { id } = await params
     const { searchParams } = new URL(request.url)
-    const client_id = searchParams.get('client_id') || CLIENT_ID
+    const client_id = auth?.botClientId || searchParams.get('client_id') || CLIENT_ID
     const denied = enforceTenant(auth, client_id)
     if (denied) return denied
     const body = await request.json()

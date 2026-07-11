@@ -3,14 +3,6 @@ import webpush from 'web-push'
 import { NextResponse } from 'next/server'
 import { getAuthedUser, unauthorized, enforceTenant } from '@/lib/auth'
 
-// Server-only route: no logged-in user session here, so the public anon key
-// would be RLS-blocked. Use the service-role key (kept server-side, never
-// NEXT_PUBLIC_ so it is not bundled into the browser).
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
-)
-
 export async function POST(req) {
   const auth = await getAuthedUser(req)
   if (!auth) return unauthorized()
@@ -35,6 +27,14 @@ export async function POST(req) {
     // cross-tenant phishing pushes). enforceTenant compares against the caller's clinic.
     const denied = enforceTenant(auth, client_id)
     if (denied) return denied
+
+    // Server-only client (service-role key). Instantiated INSIDE the handler, not at
+    // module scope, so a build with no Supabase env (e.g. the demo build) doesn't fail
+    // page-data collection with "supabaseUrl is required".
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL,
+      process.env.SUPABASE_SERVICE_ROLE_KEY
+    )
 
     // Fetch all push subscriptions for this client
     const { data: subs } = await supabase

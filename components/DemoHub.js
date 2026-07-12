@@ -30,6 +30,21 @@ function SmileyMark({ size = 46 }) {
   )
 }
 
+// NYU Abu Dhabi wordmark, in NYU violet (#57068C). A clean typographic mark — swap in
+// the official NYUAD torch logo (drop it in /public) here if an exact asset is preferred.
+function NyuadMark({ className = '' }) {
+  return (
+    <span className={`inline-flex items-center gap-2 ${className}`} aria-label="New York University Abu Dhabi">
+      <span className="inline-flex items-center rounded-md bg-[#57068C] px-1.5 py-[3px] text-[13px] font-black leading-none tracking-tight text-white">
+        NYU
+      </span>
+      <span className="text-[11.5px] font-semibold uppercase tracking-[0.16em] text-[#c9a6e6]">
+        Abu&nbsp;Dhabi
+      </span>
+    </span>
+  )
+}
+
 const CARDS = [
   {
     href: '/dashboard',
@@ -108,6 +123,16 @@ export default function DemoHub() {
           </span>
         </header>
 
+        {/* Builder credit — solo student project (NYU Abu Dhabi) */}
+        <div className="mt-6 flex flex-wrap items-center gap-x-4 gap-y-2 rounded-xl border border-[#57068C]/35 bg-[#57068C]/[0.10] px-4 py-3">
+          <NyuadMark />
+          <span className="h-3.5 w-px bg-white/15" />
+          <span className="text-[13px] leading-relaxed text-white/65">
+            Built solo by <span className="font-semibold text-white/90">Tahsin Rahman</span> — an undergraduate student at{' '}
+            <span className="font-medium text-white/90">New York University Abu Dhabi (NYUAD)</span>, here in the UAE.
+          </span>
+        </div>
+
         {/* hero */}
         <div className="mt-16 max-w-2xl">
           <h1 className="text-[2.4rem] font-extrabold leading-[1.1] tracking-tight text-white sm:text-[3rem]">
@@ -153,6 +178,12 @@ export default function DemoHub() {
 
         {/* honesty footer */}
         <footer className="mt-14 border-t border-white/[0.06] pt-6">
+          <div className="mb-4 flex flex-wrap items-center gap-3">
+            <NyuadMark />
+            <span className="text-[12px] text-white/45">
+              A solo project by <span className="text-white/70">Tahsin Rahman</span>, undergraduate at New York University Abu Dhabi (NYUAD) — built in the UAE, for UAE clinics.
+            </span>
+          </div>
           <p className="text-[12px] leading-relaxed text-white/35">
             This is a <span className="text-white/55">seeded demonstration environment</span> — the clinic,
             patients, and conversations are realistic sample data, not real people. The live production system

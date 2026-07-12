@@ -3,9 +3,9 @@
 import Link from 'next/link'
 
 const WEBSITE = 'https://www.tahsinai.com'
-// Video link is TBD (marketing to supply). Falls back to the website demo page
-// so the card never dead-ends. Swap DEMO_VIDEO_URL when the reel is ready.
-const DEMO_VIDEO_URL = `${WEBSITE}/demo`
+// Product walkthrough video (Google Drive). Opens the Drive player in a new tab.
+// NOTE: the Drive file must be shared "Anyone with the link" for judges to watch it.
+const DEMO_VIDEO_URL = 'https://drive.google.com/file/d/1N2SkmJwmIUz-QXC7Ln_84CvGrkoGT8cX/view?usp=sharing'
 
 // Judges can message the LIVE production bot themselves — "Maya", the assistant for
 // the Marina Smile Dental demo clinic, on WhatsApp Cloud API (+971 50 370 9820).

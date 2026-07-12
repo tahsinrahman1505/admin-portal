@@ -128,8 +128,9 @@ export default function DemoHub() {
           <NyuadMark />
           <span className="h-3.5 w-px bg-white/15" />
           <span className="text-[13px] leading-relaxed text-white/65">
-            Built solo by <span className="font-semibold text-white/90">Tahsin Rahman</span> — an undergraduate student at{' '}
-            <span className="font-medium text-white/90">New York University Abu Dhabi (NYUAD)</span>, here in the UAE.
+            Designed and built solo by <span className="font-semibold text-white/90">Tahsin Rahman</span>, a junior-year{' '}
+            <span className="font-medium text-white/90">Electrical Engineering</span> student at{' '}
+            <span className="font-medium text-white/90">New York University Abu Dhabi (NYUAD)</span>.
           </span>
         </div>
 
@@ -181,7 +182,7 @@ export default function DemoHub() {
           <div className="mb-4 flex flex-wrap items-center gap-3">
             <NyuadMark />
             <span className="text-[12px] text-white/45">
-              A solo project by <span className="text-white/70">Tahsin Rahman</span>, undergraduate at New York University Abu Dhabi (NYUAD) — built in the UAE, for UAE clinics.
+              A solo project by <span className="text-white/70">Tahsin Rahman</span>, a junior-year Electrical Engineering student at New York University Abu Dhabi (NYUAD) — built for UAE clinics.
             </span>
           </div>
           <p className="text-[12px] leading-relaxed text-white/35">

@@ -235,6 +235,7 @@ export default function ConversationsPage() {
   const [attaching, setAttaching]       = useState(false)
   const [summary, setSummary]           = useState(null)
   const [summarizing, setSummarizing]   = useState(false)
+  const [suggesting, setSuggesting]     = useState(false)
 
   const [liveMessages, setLiveMessages] = useState([])
   const [deliveries, setDeliveries]     = useState([]) // message_delivery rows for selected thread
@@ -498,6 +499,21 @@ export default function ConversationsPage() {
       setSummary(data.summary || 'No summary available.')
     } catch { setSummary('Failed to generate summary. Please try again.') }
     finally { setSummarizing(false) }
+  }
+
+  // ── AI Suggested reply (draft into the reply box; staff edits before sending) ──
+  async function handleSuggest() {
+    if (!selected || suggesting) return
+    setSuggesting(true)
+    try {
+      const res = await fetch(`${API_URL}/session/suggest`, {
+        method: 'POST', headers: API_HEADERS,
+        body: JSON.stringify({ session_id: selected.session_id, client_id: botClientId || 'dental_demo' })
+      })
+      const data = await res.json()
+      if (data.suggestion) setReplyText(data.suggestion)
+    } catch (e) { console.error('Suggest error:', e) }
+    finally { setSuggesting(false) }
   }
 
   // ── Owner reply — channel-aware ──
@@ -846,6 +862,23 @@ export default function ConversationsPage() {
             {/* Reply box — only during handoff */}
             {selectedHandedOff && (
               <div className="shrink-0 border-t border-white/[0.06] bg-white/[0.02] px-4 py-3">
+                <div className="flex items-center justify-between mb-2">
+                  <button
+                    onClick={handleSuggest}
+                    disabled={suggesting || sending}
+                    title="Draft a reply with AI — review and edit before sending"
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11.5px] font-medium
+                               bg-indigo-500/10 text-indigo-300 border border-indigo-500/20
+                               hover:bg-indigo-500/20 transition-colors
+                               disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    {suggesting ? (
+                      <span className="w-3 h-3 border border-indigo-300/40 border-t-indigo-300 rounded-full animate-spin inline-block" />
+                    ) : <span>✨</span>}
+                    {suggesting ? 'Drafting…' : 'Suggest reply'}
+                  </button>
+                  <span className="text-[10.5px] text-white/20">AI draft · you edit before sending</span>
+                </div>
                 <div className="flex items-end gap-2">
                   <input
                     ref={fileInputRef}

@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
 import RealtimeToast from '@/components/RealtimeToast'
 import NotificationBell from '@/components/NotificationBell'
+import ThemeToggle from '@/components/ThemeToggle'
 
 const NAV = [
   {
@@ -185,7 +186,7 @@ export default function PortalLayout({ children }) {
   }
 
   return (
-    <div className="flex h-screen bg-[#080808] overflow-hidden">
+    <div className="flex h-screen bg-[var(--background)] overflow-hidden">
       {/* Sidebar */}
       <aside className="w-[228px] shrink-0 flex flex-col bg-white/[0.02] border-r border-white/[0.06]">
         {/* Logo */}
@@ -289,6 +290,9 @@ export default function PortalLayout({ children }) {
           <p className="text-[11px] text-white/20 px-3 mb-3 truncate" style={{ fontFamily: 'var(--font-jakarta)' }}>
             {userEmail}
           </p>
+          <div className="mb-1" style={{ fontFamily: 'var(--font-jakarta)' }}>
+            <ThemeToggle />
+          </div>
           <button
             onClick={handleLogout}
             className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-[13px] text-white/35 hover:text-red-400 hover:bg-red-400/[0.07] transition-all duration-150"
@@ -303,7 +307,7 @@ export default function PortalLayout({ children }) {
       </aside>
 
       {/* Main */}
-      <main className="flex-1 overflow-auto bg-[#080808]">
+      <main className="flex-1 overflow-auto bg-[var(--background)]">
         {children}
       </main>
 

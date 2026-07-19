@@ -713,7 +713,7 @@ export default function ConversationsPage() {
       </div>
 
       {/* ── Chat panel ── */}
-      <div className="flex-1 flex flex-col overflow-hidden bg-[#080808]">
+      <div className="flex-1 flex flex-col overflow-hidden bg-[var(--background)]">
         {!selected ? (
           <div className="flex items-center justify-center h-full text-white/20 text-sm">
             Select a conversation to view

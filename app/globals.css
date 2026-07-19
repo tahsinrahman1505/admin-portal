@@ -1,8 +1,43 @@
 @import "tailwindcss";
 
-:root {
+/* ── Theming ──────────────────────────────────────────────────────────────────
+ * The portal is authored dark-first: surfaces, borders and text are expressed as
+ * white at low opacity (bg-white/[0.03], text-white/45, border-white/[0.07]) over
+ * a near-black page. That means "white" is really "the foreground colour" — so we
+ * theme by REDEFINING the --color-white token rather than rewriting ~930 utility
+ * classes across 20 files. In light mode white becomes near-black ink, and every
+ * surface/border/text shade inverts to the correct semantic automatically.
+ * Verified: bg-white/[0.02] → oklab(0 0 0 / 0.02); text-white → near-black.
+ * Dark is the default; [data-theme="light"] opts in. */
+:root,
+:root[data-theme="dark"] {
   --background: #080808;
   --foreground: #f0f0f0;
+  --color-white: #ffffff;   /* foreground ink for the opacity scale */
+  --color-black: #000000;
+  --scrollbar-thumb: rgba(255, 255, 255, 0.08);
+  /* Raised surfaces (drawers, modals, dropdowns, tooltips) sit ABOVE the page, so
+   * they need their own solid colour rather than a translucent white tint. */
+  --surface-raised: #0e1c22;
+  --surface-overlay: #0e0e0e;
+}
+
+:root[data-theme="light"] {
+  --background: #f6f7f9;    /* soft off-white — less glare than pure #fff */
+  --foreground: #14161a;
+  --color-white: #0d1117;   /* inverts every white/[opacity] surface + text */
+  --color-black: #ffffff;   /* the few bg-black usages flip to white */
+  --scrollbar-thumb: rgba(0, 0, 0, 0.14);
+  --surface-raised: #ffffff;   /* white cards lift off the off-white page */
+  --surface-overlay: #ffffff;
+}
+
+/* The brand mint reads well on near-black but fails contrast as text on light.
+ * Arbitrary-value classes can't be re-tokenised, so match them by class substring
+ * (specificity 0,2,0 beats the 0,1,0 utility) and darken only TEXT usages —
+ * fills and borders stay mint and still look correct on a light ground. */
+:root[data-theme="light"] [class*="text-[#00e5b0]"] {
+  color: #00916e;
 }
 
 @theme inline {
@@ -11,11 +46,19 @@
   --font-sans: var(--font-jakarta);
 }
 
+/* Set it on <html> too: the canvas (overscroll area, and any gap a page's own
+ * shell doesn't cover) takes its colour from the root element, so theming only
+ * <body> can leave a dark band behind a light page. */
+html {
+  background: var(--background);
+}
+
 body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-jakarta), system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
+  transition: background-color 0.2s ease, color 0.2s ease;
 }
 
 * { box-sizing: border-box; }
@@ -29,7 +72,7 @@ body {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--scrollbar-thumb);
   border-radius: 99px;
   transition: background 0.2s;
 }
@@ -43,5 +86,5 @@ body {
 /* Firefox */
 * {
   scrollbar-width: thin;
-  scrollbar-color: rgba(255, 255, 255, 0.08) transparent;
+  scrollbar-color: var(--scrollbar-thumb) transparent;
 }

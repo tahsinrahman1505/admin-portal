@@ -66,7 +66,7 @@ export default function RealtimeToast() {
             animate={{ opacity: 1, x: 0, scale: 1 }}
             exit={{ opacity: 0, x: 20, scale: 0.95 }}
             transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
-            className="pointer-events-auto flex items-start gap-3 bg-[#0f1c22]/95 backdrop-blur-xl border border-[#00e5b0]/20 rounded-2xl px-4 py-3.5 shadow-[0_8px_32px_rgba(0,0,0,0.5)] max-w-[300px]"
+            className="pointer-events-auto flex items-start gap-3 bg-[var(--surface-raised)]/95 backdrop-blur-xl border border-[#00e5b0]/20 rounded-2xl px-4 py-3.5 shadow-[0_8px_32px_rgba(0,0,0,0.5)] max-w-[300px]"
           >
             {/* Icon */}
             <div className="relative shrink-0 mt-0.5">

@@ -96,7 +96,7 @@ function DoctorModal({ doctor, onSave, onClose }) {
       <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
         className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40" onClick={onClose} />
       <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }}
-        className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[480px] bg-[#0e1c22] border border-white/[0.09] rounded-2xl z-50 p-6 shadow-2xl">
+        className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[480px] bg-[var(--surface-raised)] border border-white/[0.09] rounded-2xl z-50 p-6 shadow-2xl">
         <h2 className="text-white font-bold text-[16px] mb-5">{isEdit ? 'Edit Doctor' : 'Add Doctor'}</h2>
         <div className="space-y-4">
           {[
@@ -214,7 +214,7 @@ function ManagePanel({ doctor, onClose }) {
       <motion.div
         initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }}
         transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
-        className="fixed right-0 top-0 h-full w-[560px] bg-[#0e1c22] border-l border-white/[0.08] z-50 flex flex-col overflow-hidden"
+        className="fixed right-0 top-0 h-full w-[560px] bg-[var(--surface-raised)] border-l border-white/[0.08] z-50 flex flex-col overflow-hidden"
       >
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-5 border-b border-white/[0.06] shrink-0">

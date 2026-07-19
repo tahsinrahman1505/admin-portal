@@ -344,7 +344,7 @@ export default function ActivityPage() {
                     key={`sep-${item.label}`}
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
-                    className="flex items-center gap-3 py-3 sticky top-0 bg-[#0e0e0e]/80 backdrop-blur-sm z-10"
+                    className="flex items-center gap-3 py-3 sticky top-0 bg-[var(--surface-overlay)]/80 backdrop-blur-sm z-10"
                   >
                     <div className="h-px flex-1 bg-white/[0.05]" />
                     <span className="text-[10.5px] text-white/20 font-semibold uppercase tracking-widest shrink-0">{item.label}</span>

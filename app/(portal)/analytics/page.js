@@ -99,7 +99,7 @@ function buildHourBuckets(msgs) {
 function CustomTooltip({ active, payload, label }) {
   if (!active || !payload?.length) return null
   return (
-    <div className="bg-[#111c22] border border-white/[0.08] rounded-xl px-3.5 py-2.5 shadow-xl">
+    <div className="bg-[var(--surface-raised)] border border-white/[0.08] rounded-xl px-3.5 py-2.5 shadow-xl">
       <p className="text-white/40 text-[10.5px] mb-1.5" style={{ fontFamily: 'var(--font-jakarta)' }}>{label}</p>
       {payload.map((p, i) => (
         <p key={i} className="text-[12px] font-semibold" style={{ color: p.color, fontFamily: 'var(--font-jakarta)' }}>

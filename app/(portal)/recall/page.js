@@ -193,7 +193,7 @@ export default function RecallPage() {
                     onChange={e => setInterval(parseInt(e.target.value, 10))}
                     className="bg-white/[0.05] border border-white/[0.08] rounded-lg px-2.5 py-1.5 text-white/70 text-[12px] outline-none focus:border-[#00e5b0]/30"
                   >
-                    {[3, 4, 6, 9, 12].map(m => <option key={m} value={m} className="bg-[#0e1c22]">{m} months</option>)}
+                    {[3, 4, 6, 9, 12].map(m => <option key={m} value={m} className="bg-[var(--surface-raised)]">{m} months</option>)}
                   </select>
                 </label>
                 <div className="flex items-center gap-3">

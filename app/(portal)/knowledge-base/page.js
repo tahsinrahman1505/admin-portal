@@ -1,9 +1,9 @@
 'use client'
 import { useState, useEffect, useRef } from 'react'
+import { resolveBotClientId } from '@/lib/clientId'
 
 // API calls go through server-side proxy routes so the secret never hits the browser
 const FASTAPI_URL  = '/api/rag'
-const CLIENT_ID    = process.env.NEXT_PUBLIC_CLIENT_ID || 'default'
 
 export default function KnowledgeBasePage() {
   const [documents, setDocuments] = useState([])
@@ -12,18 +12,22 @@ export default function KnowledgeBasePage() {
   const [uploadError, setUploadError] = useState(null)
   const [dragOver, setDragOver] = useState(false)
   const [selectedFile, setSelectedFile] = useState(null)
+  // client_id resolved from the logged-in user (multi-tenant), not an env var.
+  const [clientId, setClientId] = useState(null)
   const fileInputRef = useRef(null)
 
-  async function fetchDocuments() {
+  async function fetchDocuments(cid) {
     try {
-      const res = await fetch(`${FASTAPI_URL}/ingest/list?client_id=${CLIENT_ID}`)
+      const res = await fetch(`${FASTAPI_URL}/ingest/list?client_id=${cid}`)
       const data = await res.json()
       setDocuments(data.documents || [])
     } catch { setDocuments([]) }
     finally { setLoading(false) }
   }
 
-  useEffect(() => { fetchDocuments() }, [])
+  useEffect(() => {
+    resolveBotClientId().then(cid => { setClientId(cid); fetchDocuments(cid) })
+  }, [])
 
   function handleDrop(e) {
     e.preventDefault(); setDragOver(false)
@@ -41,16 +45,17 @@ export default function KnowledgeBasePage() {
   async function handleUpload() {
     if (!selectedFile) return
     setUploading(true); setUploadError(null)
+    const cid = clientId || await resolveBotClientId()
     const formData = new FormData()
     formData.append('file', selectedFile)
-    formData.append('client_id', CLIENT_ID)
+    formData.append('client_id', cid)
     try {
       const res = await fetch(`${FASTAPI_URL}/ingest`, {
         method: 'POST',
         body: formData
       })
       if (!res.ok) throw new Error()
-      setSelectedFile(null); await fetchDocuments()
+      setSelectedFile(null); await fetchDocuments(cid)
     } catch { setUploadError('Something went wrong — try again.') }
     finally { setUploading(false) }
   }

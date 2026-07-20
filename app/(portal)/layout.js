@@ -3,9 +3,40 @@
 import { useEffect, useState } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
 import Link from 'next/link'
+import { motion } from 'framer-motion'
 import { supabase } from '@/lib/supabase'
 import RealtimeToast from '@/components/RealtimeToast'
 import NotificationBell from '@/components/NotificationBell'
+import AuroraBackground from '@/components/AuroraBackground'
+
+/* Nav row with a shared-layout active pill: the highlight physically slides
+   from the old item to the new one on navigation (layoutId), instead of just
+   toggling. Small detail, big "this was designed" signal. */
+function NavItem({ item, active }) {
+  return (
+    <Link
+      href={item.href}
+      className={`group relative flex items-center gap-3 px-3 py-2.5 rounded-xl text-[13.5px] transition-colors duration-200 ${
+        active ? 'text-[#00e5b0]' : 'text-[var(--ink-2)] hover:text-[var(--ink-1)]'
+      }`}
+      style={{ fontFamily: 'var(--font-jakarta)' }}
+    >
+      {active && (
+        <motion.span
+          layoutId="nav-active-pill"
+          className="absolute inset-0 rounded-xl"
+          style={{ background: 'var(--accent-soft)', boxShadow: 'inset 0 1px 0 0 rgba(0,229,176,0.20)' }}
+          transition={{ type: 'spring', stiffness: 380, damping: 32 }}
+        />
+      )}
+      <span className={`relative z-10 transition-colors duration-200 ${active ? 'text-[#00e5b0]' : 'text-[var(--ink-3)] group-hover:text-[var(--ink-2)]'}`}>
+        {item.icon}
+      </span>
+      <span className="relative z-10">{item.label}</span>
+      {active && <span className="relative z-10 ml-auto w-1.5 h-1.5 rounded-full bg-[#00e5b0] shadow-[0_0_8px_rgba(0,229,176,0.8)]" />}
+    </Link>
+  )
+}
 
 const NAV = [
   {
@@ -176,131 +207,79 @@ export default function PortalLayout({ children }) {
     router.push('/login')
   }
 
+  const GROUPS = [
+    { label: 'Main', items: NAV.slice(0, 4) },
+    { label: 'Insights', items: NAV.slice(4, 7) },
+    { label: 'Config', items: NAV.slice(7) },
+  ]
+
   return (
-    <div className="flex h-screen bg-[#080808] overflow-hidden">
-      {/* Sidebar */}
-      <aside className="w-[228px] shrink-0 flex flex-col bg-white/[0.02] border-r border-white/[0.06]">
-        {/* Logo */}
-        <div className="px-4 pt-7 pb-6">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2.5">
-              <div className="w-7 h-7 rounded-lg bg-[#00e5b0]/10 border border-[#00e5b0]/25 flex items-center justify-center shrink-0">
-                <span className="text-[#00e5b0] text-[11px] font-extrabold" style={{ fontFamily: 'var(--font-jakarta)' }}>T</span>
+    <>
+      <AuroraBackground />
+      <div className="flex h-screen overflow-hidden">
+        {/* Sidebar — floating glass rail */}
+        <aside className="w-[236px] shrink-0 p-3">
+          <div className="glass sheen rounded-[var(--r-lg)] h-full flex flex-col overflow-hidden">
+            {/* Logo */}
+            <div className="px-4 pt-6 pb-5">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-[11px] flex items-center justify-center shrink-0"
+                       style={{ background: 'linear-gradient(135deg, rgba(0,229,176,0.22), rgba(124,92,255,0.18))', border: '1px solid rgba(0,229,176,0.3)', boxShadow: '0 0 20px rgba(0,229,176,0.18)' }}>
+                    <span className="text-[#00e5b0] text-[12px] font-extrabold" style={{ fontFamily: 'var(--font-jakarta)' }}>T</span>
+                  </div>
+                  <span className="text-[var(--ink-1)] font-extrabold text-[15px] tracking-tight" style={{ fontFamily: 'var(--font-jakarta)' }}>
+                    Tahsin<span className="text-[#00e5b0]">.</span>ai
+                  </span>
+                </div>
+                <NotificationBell clientId={clientId} />
               </div>
-              <span className="text-white font-extrabold text-[15px] tracking-tight" style={{ fontFamily: 'var(--font-jakarta)' }}>
-                Tahsin<span className="text-[#00e5b0]">.</span>ai
-              </span>
+              <p className="text-[var(--ink-3)] text-[10.5px] mt-2 ml-[2px] tracking-wide" style={{ fontFamily: 'var(--font-jakarta)' }}>
+                Client Portal
+              </p>
             </div>
-            <NotificationBell clientId={clientId} />
+
+            {/* Nav */}
+            <nav className="flex-1 px-3 overflow-y-auto space-y-0.5 pb-2">
+              {GROUPS.map((group, gi) => (
+                <div key={group.label}>
+                  <p className={`text-[10px] font-semibold text-[var(--ink-4)] uppercase tracking-[0.14em] px-3 mb-2 ${gi > 0 ? 'pt-4' : ''}`} style={{ fontFamily: 'var(--font-jakarta)' }}>
+                    {group.label}
+                  </p>
+                  {group.items.map(item => (
+                    <NavItem key={item.href} item={item} active={pathname === item.href} />
+                  ))}
+                </div>
+              ))}
+            </nav>
+
+            {/* Bottom */}
+            <div className="px-3 pb-4 pt-4 mx-3 border-t border-white/[0.06]">
+              <p className="text-[11px] text-[var(--ink-3)] px-1 mb-2.5 truncate" style={{ fontFamily: 'var(--font-jakarta)' }}>
+                {userEmail}
+              </p>
+              <button
+                onClick={handleLogout}
+                className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-[13px] text-[var(--ink-2)] hover:text-red-400 hover:bg-red-400/[0.08] transition-all duration-200"
+                style={{ fontFamily: 'var(--font-jakarta)' }}
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.7} className="w-4 h-4">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15M12 9l-3 3m0 0l3 3m-3-3h12.75"/>
+                </svg>
+                Sign out
+              </button>
+            </div>
           </div>
-          <p className="text-white/20 text-[10.5px] mt-2 ml-[2px]" style={{ fontFamily: 'var(--font-jakarta)' }}>
-            Client Portal
-          </p>
-        </div>
+        </aside>
 
-        {/* Nav */}
-        <nav className="flex-1 px-3 overflow-y-auto space-y-0.5 pb-2">
-          <p className="text-[10px] font-semibold text-white/20 uppercase tracking-[0.12em] px-3 mb-2" style={{ fontFamily: 'var(--font-jakarta)' }}>
-            Main
-          </p>
-          {NAV.slice(0, 4).map(item => {
-            const isActive = pathname === item.href
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-[13.5px] transition-all duration-150 ${
-                  isActive
-                    ? 'bg-[#00e5b0]/[0.1] text-[#00e5b0]'
-                    : 'text-white/40 hover:text-white/75 hover:bg-white/[0.04]'
-                }`}
-                style={{ fontFamily: 'var(--font-jakarta)' }}
-              >
-                <span className={isActive ? 'text-[#00e5b0]' : 'text-white/30'}>{item.icon}</span>
-                {item.label}
-                {isActive && (
-                  <span className="ml-auto w-1 h-1 rounded-full bg-[#00e5b0]" />
-                )}
-              </Link>
-            )
-          })}
+        {/* Main */}
+        <main className="flex-1 overflow-auto">
+          {children}
+        </main>
 
-          <p className="text-[10px] font-semibold text-white/20 uppercase tracking-[0.12em] px-3 pt-4 mb-2" style={{ fontFamily: 'var(--font-jakarta)' }}>
-            Insights
-          </p>
-          {NAV.slice(4, 7).map(item => {
-            const isActive = pathname === item.href
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-[13.5px] transition-all duration-150 ${
-                  isActive
-                    ? 'bg-[#00e5b0]/[0.1] text-[#00e5b0]'
-                    : 'text-white/40 hover:text-white/75 hover:bg-white/[0.04]'
-                }`}
-                style={{ fontFamily: 'var(--font-jakarta)' }}
-              >
-                <span className={isActive ? 'text-[#00e5b0]' : 'text-white/30'}>{item.icon}</span>
-                {item.label}
-                {isActive && (
-                  <span className="ml-auto w-1 h-1 rounded-full bg-[#00e5b0]" />
-                )}
-              </Link>
-            )
-          })}
-
-          <p className="text-[10px] font-semibold text-white/20 uppercase tracking-[0.12em] px-3 pt-4 mb-2" style={{ fontFamily: 'var(--font-jakarta)' }}>
-            Config
-          </p>
-          {NAV.slice(7).map(item => {
-            const isActive = pathname === item.href
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-[13.5px] transition-all duration-150 ${
-                  isActive
-                    ? 'bg-[#00e5b0]/[0.1] text-[#00e5b0]'
-                    : 'text-white/40 hover:text-white/75 hover:bg-white/[0.04]'
-                }`}
-                style={{ fontFamily: 'var(--font-jakarta)' }}
-              >
-                <span className={isActive ? 'text-[#00e5b0]' : 'text-white/30'}>{item.icon}</span>
-                {item.label}
-                {isActive && (
-                  <span className="ml-auto w-1 h-1 rounded-full bg-[#00e5b0]" />
-                )}
-              </Link>
-            )
-          })}
-        </nav>
-
-        {/* Bottom */}
-        <div className="px-3 pb-5 pt-4 border-t border-white/[0.05]">
-          <p className="text-[11px] text-white/20 px-3 mb-3 truncate" style={{ fontFamily: 'var(--font-jakarta)' }}>
-            {userEmail}
-          </p>
-          <button
-            onClick={handleLogout}
-            className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-[13px] text-white/35 hover:text-red-400 hover:bg-red-400/[0.07] transition-all duration-150"
-            style={{ fontFamily: 'var(--font-jakarta)' }}
-          >
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.7} className="w-4 h-4">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15M12 9l-3 3m0 0l3 3m-3-3h12.75"/>
-            </svg>
-            Sign out
-          </button>
-        </div>
-      </aside>
-
-      {/* Main */}
-      <main className="flex-1 overflow-auto bg-[#080808]">
-        {children}
-      </main>
-
-      {/* Global realtime toast */}
-      <RealtimeToast />
-    </div>
+        {/* Global realtime toast */}
+        <RealtimeToast />
+      </div>
+    </>
   )
 }

@@ -17,7 +17,7 @@ export async function PUT(request, { params }) {
   try {
     const { id } = await params
     const { searchParams } = new URL(request.url)
-    const client_id = searchParams.get('client_id') || CLIENT_ID
+    const client_id = auth?.botClientId || searchParams.get('client_id') || CLIENT_ID
     const body = await request.json()
     const res = await fetch(
       `${RAG_URL}/doctors/${encodeURIComponent(id)}?client_id=${encodeURIComponent(client_id)}`,
@@ -40,7 +40,7 @@ export async function DELETE(request, { params }) {
   try {
     const { id } = await params
     const { searchParams } = new URL(request.url)
-    const client_id = searchParams.get('client_id') || CLIENT_ID
+    const client_id = auth?.botClientId || searchParams.get('client_id') || CLIENT_ID
     const res = await fetch(
       `${RAG_URL}/doctors/${encodeURIComponent(id)}?client_id=${encodeURIComponent(client_id)}`,
       { method: 'DELETE', headers: { 'x-api-key': API_SECRET } }

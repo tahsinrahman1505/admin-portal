@@ -18,7 +18,8 @@ export async function GET(request) {
   if (!auth) return unauthorized()
   try {
     const { searchParams } = new URL(request.url)
-    const client_id = searchParams.get('client_id') || 'dental_demo'
+    // Server-authoritative: use the logged-in user's clinic, not the browser-sent param.
+    const client_id = auth.botClientId || searchParams.get('client_id') || 'dental_demo'
     const denied = enforceTenant(auth, client_id)
     if (denied) return denied
     const res = await fetch(`${RAG_URL}/doctors?client_id=${encodeURIComponent(client_id)}`, {
@@ -38,6 +39,9 @@ export async function POST(request) {
   if (!auth) return unauthorized()
   try {
     const body = await request.json()
+    // Server-authoritative: force the doctor onto the logged-in user's clinic so a
+    // stale/forged client_id in the body can't create a doctor under another tenant.
+    if (auth.botClientId) body.client_id = auth.botClientId
     const res = await fetch(`${RAG_URL}/doctors`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-api-key': API_SECRET },

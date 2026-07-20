@@ -13,8 +13,10 @@
  */
 import { NextResponse } from 'next/server'
 import crypto from 'crypto'
+import { getAuthedUser } from '@/lib/auth'
 
-const CLIENT_ID = process.env.NEXT_PUBLIC_CLIENT_ID || 'default'
+// Legacy single-tenant fallback — used only if the caller can't be resolved to a clinic.
+const FALLBACK_CLIENT_ID = process.env.NEXT_PUBLIC_CLIENT_ID || 'default'
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_OAUTH_CLIENT_ID || ''
 const SCOPE = 'https://www.googleapis.com/auth/calendar'
 
@@ -37,9 +39,15 @@ export async function GET(request) {
   const doctorId = searchParams.get('doctor_id') || ''
   const nonce = crypto.randomBytes(16).toString('hex')
 
+  // Multi-tenant: connect the calendar to the LOGGED-IN user's clinic, not a
+  // build-time env var. The callback writes the refresh token to client_configs
+  // WHERE client_id = state.c, so this is what routes the token to the right clinic.
+  const auth = await getAuthedUser(request)
+  const clientId = auth?.botClientId || FALLBACK_CLIENT_ID
+
   // state carries: clinic client_id, optional doctor_id, and the CSRF nonce.
   const state = Buffer.from(
-    JSON.stringify({ c: CLIENT_ID, d: doctorId, n: nonce }),
+    JSON.stringify({ c: clientId, d: doctorId, n: nonce }),
   ).toString('base64url')
 
   const params = new URLSearchParams({

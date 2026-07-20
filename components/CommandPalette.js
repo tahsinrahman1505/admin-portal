@@ -83,7 +83,7 @@ export default function CommandPalette() {
           <div className="absolute inset-0" style={{ background: 'rgba(4,6,9,0.5)', backdropFilter: 'blur(6px)' }} />
 
           <motion.div
-            className="glass-strong sheen relative w-full max-w-[560px] rounded-[var(--r-lg)] overflow-hidden"
+            className="glass-overlay sheen relative w-full max-w-[560px] rounded-[var(--r-lg)] overflow-hidden"
             initial={{ opacity: 0, y: 12, scale: 0.98 }}
             animate={{ opacity: 1, y: 0, scale: 1, transition: { type: 'spring', stiffness: 300, damping: 26 } }}
             exit={{ opacity: 0, y: 8, scale: 0.98, transition: { duration: 0.15 } }}

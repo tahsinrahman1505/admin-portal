@@ -8,6 +8,7 @@ import { supabase } from '@/lib/supabase'
 import RealtimeToast from '@/components/RealtimeToast'
 import NotificationBell from '@/components/NotificationBell'
 import AuroraBackground from '@/components/AuroraBackground'
+import CommandPalette from '@/components/CommandPalette'
 
 /* Nav row with a shared-layout active pill: the highlight physically slides
    from the old item to the new one on navigation (layoutId), instead of just
@@ -216,6 +217,7 @@ export default function PortalLayout({ children }) {
   return (
     <>
       <AuroraBackground />
+      <CommandPalette />
       <div className="flex h-screen overflow-hidden">
         {/* Sidebar — floating glass rail */}
         <aside className="w-[236px] shrink-0 p-3">
@@ -237,6 +239,24 @@ export default function PortalLayout({ children }) {
               <p className="text-[var(--ink-3)] text-[10.5px] mt-2 ml-[2px] tracking-wide" style={{ fontFamily: 'var(--font-jakarta)' }}>
                 Client Portal
               </p>
+            </div>
+
+            {/* ⌘K trigger — dispatches the same hotkey the palette listens for */}
+            <div className="px-3 pb-3">
+              <button
+                onClick={() => {
+                  const isMac = navigator.platform.toUpperCase().includes('MAC')
+                  window.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', metaKey: isMac, ctrlKey: !isMac, bubbles: true }))
+                }}
+                className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl bg-white/[0.03] border border-white/[0.07] text-[var(--ink-3)] hover:text-[var(--ink-1)] hover:border-white/[0.12] transition-colors duration-200"
+                style={{ fontFamily: 'var(--font-jakarta)' }}
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.7} className="w-3.5 h-3.5 shrink-0">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35M17 11a6 6 0 11-12 0 6 6 0 0112 0z" />
+                </svg>
+                <span className="text-[12.5px]">Search…</span>
+                <kbd className="ml-auto text-[10px] border border-white/[0.12] rounded px-1.5 py-0.5 tnum">⌘K</kbd>
+              </button>
             </div>
 
             {/* Nav */}

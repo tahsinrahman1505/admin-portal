@@ -261,10 +261,10 @@ export default function ActivityPage() {
               <button
                 key={s.type}
                 onClick={() => setFilter(filter === s.type ? 'all' : s.type)}
-                className={`text-left p-4 rounded-2xl border transition-all duration-150 ${
+                className={`text-left p-4 rounded-2xl border backdrop-blur-xl transition-all duration-150 ${
                   filter === s.type
                     ? `${t.ring} ${t.color}`
-                    : 'bg-white/[0.025] border-white/[0.06] text-white/40 hover:border-white/[0.1]'
+                    : 'bg-white/[0.03] border-white/[0.07] text-white/40 hover:border-white/[0.1]'
                 }`}
               >
                 <p className="text-[1.4rem] font-extrabold tabular-nums leading-none mb-1">{s.count}</p>
@@ -290,7 +290,7 @@ export default function ActivityPage() {
             value={search}
             onChange={e => { setSearch(e.target.value); setPage(1) }}
             placeholder="Search activity…"
-            className="w-full bg-white/[0.04] border border-white/[0.07] rounded-xl pl-8 pr-3 py-2 text-[12.5px] text-white/70 placeholder-white/20 outline-none focus:border-[#00e5b0]/30 transition-colors"
+            className="w-full bg-white/[0.04] border border-white/[0.07] backdrop-blur-xl rounded-xl pl-8 pr-3 py-2 text-[12.5px] text-white/70 placeholder-white/20 outline-none focus:border-[#00e5b0]/30 transition-colors"
           />
         </div>
 
@@ -302,7 +302,7 @@ export default function ActivityPage() {
               className={`px-3 py-1.5 rounded-lg text-[11.5px] font-semibold transition-all duration-150 capitalize ${
                 filter === f
                   ? 'bg-[#00e5b0]/[0.15] text-[#00e5b0] border border-[#00e5b0]/20'
-                  : 'bg-white/[0.04] text-white/30 border border-white/[0.06] hover:text-white/50'
+                  : 'bg-white/[0.04] text-white/30 border border-white/[0.06] backdrop-blur-xl hover:text-white/50'
               }`}
             >
               {f === 'all' ? `All (${events.length})` : f}
@@ -316,7 +316,7 @@ export default function ActivityPage() {
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.45, delay: 0.1 }}
-        className="bg-white/[0.02] border border-white/[0.07] rounded-2xl px-6 py-2"
+        className="glass sheen rounded-[var(--r-md)] relative px-6 py-2"
       >
         {loading ? (
           <div className="space-y-4 py-4">
@@ -344,7 +344,7 @@ export default function ActivityPage() {
                     key={`sep-${item.label}`}
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
-                    className="flex items-center gap-3 py-3 sticky top-0 bg-[#0e0e0e]/80 backdrop-blur-sm z-10"
+                    className="flex items-center gap-3 py-3 sticky top-0 bg-white/[0.03] backdrop-blur-xl z-10"
                   >
                     <div className="h-px flex-1 bg-white/[0.05]" />
                     <span className="text-[10.5px] text-white/20 font-semibold uppercase tracking-widest shrink-0">{item.label}</span>

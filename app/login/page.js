@@ -2,6 +2,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '../../lib/supabase'
+import AuroraBackground from '../../components/AuroraBackground'
 
 export default function LoginPage() {
   const router = useRouter()
@@ -30,36 +31,35 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#080808] flex items-center justify-center px-4 relative overflow-hidden">
-      {/* Ambient glow */}
-      <div className="pointer-events-none absolute inset-0">
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[400px] rounded-full bg-[#00e5b0]/[0.055] blur-[140px]" />
-      </div>
+    <div className="min-h-screen flex items-center justify-center px-4 relative overflow-hidden">
+      <AuroraBackground />
 
       <div
-        className="relative z-10 w-full max-w-[400px] bg-white/[0.03] border border-white/[0.08] rounded-2xl p-10 backdrop-blur-sm"
-        style={{ animation: 'fadeUp 0.5s ease both' }}
+        className="glass-strong sheen relative z-10 w-full max-w-[410px] rounded-[var(--r-lg)] p-10"
+        style={{ animation: 'fadeUp 0.6s cubic-bezier(0.16,1,0.3,1) both' }}
       >
-        <style>{`@keyframes fadeUp { from { opacity:0; transform:translateY(20px); } to { opacity:1; transform:translateY(0); } }`}</style>
+        <style>{`@keyframes fadeUp { from { opacity:0; transform:translateY(24px) scale(0.98); } to { opacity:1; transform:translateY(0) scale(1); } }`}</style>
 
         {/* Logo */}
         <div className="flex items-center gap-2.5 mb-9">
-          <div className="w-8 h-8 rounded-lg bg-[#00e5b0]/10 border border-[#00e5b0]/25 flex items-center justify-center shrink-0">
-            <span className="text-[#00e5b0] text-[13px] font-extrabold">T</span>
+          <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
+               style={{ background: 'linear-gradient(135deg, rgba(0,229,176,0.24), rgba(124,92,255,0.2))', border: '1px solid rgba(0,229,176,0.32)', boxShadow: '0 0 24px rgba(0,229,176,0.22)' }}>
+            <span className="text-[#00e5b0] text-[14px] font-extrabold">T</span>
           </div>
-          <span className="text-white font-extrabold text-[17px] tracking-tight">
+          <span className="text-[var(--ink-1)] font-extrabold text-[17px] tracking-tight">
             Tahsin<span className="text-[#00e5b0]">.</span>ai
           </span>
         </div>
 
-        <h1 className="text-[1.7rem] font-extrabold text-white tracking-tight leading-tight mb-1.5">
+        <h1 className="text-[1.85rem] font-extrabold text-[var(--ink-1)] tracking-tight leading-tight mb-1.5"
+            style={{ textWrap: 'balance' }}>
           Welcome back
         </h1>
-        <p className="text-white/35 text-[13.5px] mb-8">Sign in to your clinic dashboard</p>
+        <p className="text-[var(--ink-2)] text-[13.5px] mb-8">Sign in to your clinic dashboard</p>
 
         <form onSubmit={handleLogin} className="space-y-4">
           <div>
-            <label className="block text-[11px] font-semibold text-white/40 uppercase tracking-[0.1em] mb-2">
+            <label className="block text-[11px] font-semibold text-[var(--ink-3)] uppercase tracking-[0.12em] mb-2">
               Email
             </label>
             <input
@@ -68,12 +68,12 @@ export default function LoginPage() {
               onChange={e => setEmail(e.target.value)}
               placeholder="you@example.com"
               required
-              className="w-full bg-white/[0.05] border border-white/[0.08] rounded-xl px-4 py-3 text-[14px] text-white placeholder-white/20 outline-none focus:border-[#00e5b0]/50 focus:bg-[#00e5b0]/[0.04] transition-all duration-200"
+              className="w-full bg-white/[0.05] border border-white/[0.09] rounded-xl px-4 py-3 text-[14px] text-[var(--ink-1)] placeholder-[var(--ink-4)] outline-none focus:border-[#00e5b0]/50 focus:bg-[#00e5b0]/[0.05] transition-all duration-200"
             />
           </div>
 
           <div>
-            <label className="block text-[11px] font-semibold text-white/40 uppercase tracking-[0.1em] mb-2">
+            <label className="block text-[11px] font-semibold text-[var(--ink-3)] uppercase tracking-[0.12em] mb-2">
               Password
             </label>
             <input
@@ -82,7 +82,7 @@ export default function LoginPage() {
               onChange={e => setPassword(e.target.value)}
               placeholder="••••••••"
               required
-              className="w-full bg-white/[0.05] border border-white/[0.08] rounded-xl px-4 py-3 text-[14px] text-white placeholder-white/20 outline-none focus:border-[#00e5b0]/50 focus:bg-[#00e5b0]/[0.04] transition-all duration-200"
+              className="w-full bg-white/[0.05] border border-white/[0.09] rounded-xl px-4 py-3 text-[14px] text-[var(--ink-1)] placeholder-[var(--ink-4)] outline-none focus:border-[#00e5b0]/50 focus:bg-[#00e5b0]/[0.05] transition-all duration-200"
             />
           </div>
 
@@ -95,9 +95,12 @@ export default function LoginPage() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full mt-2 bg-[#00e5b0] text-[#080808] font-bold py-3.5 rounded-xl text-[14px] hover:brightness-110 active:scale-[0.98] disabled:opacity-50 transition-all duration-150"
+            className="group relative w-full mt-2 overflow-hidden text-[#04110d] font-bold py-3.5 rounded-xl text-[14px] active:scale-[0.98] disabled:opacity-50 transition-all duration-200"
+            style={{ background: 'linear-gradient(135deg, #00e5b0, #22d3ee)', boxShadow: '0 8px 30px rgba(0,229,176,0.28)' }}
           >
-            {loading ? 'Signing in…' : 'Sign in →'}
+            <span className="relative z-10">{loading ? 'Signing in…' : 'Sign in →'}</span>
+            <span className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300"
+                  style={{ background: 'linear-gradient(135deg, #22d3ee, #7c5cff)' }} />
           </button>
         </form>
       </div>

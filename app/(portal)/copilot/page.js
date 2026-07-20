@@ -46,7 +46,7 @@ function ActionCard({ action, index, onDismiss }) {
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, x: 40, transition: { duration: 0.2 } }}
       transition={{ duration: 0.4, delay: index * 0.05, ease: [0.16, 1, 0.3, 1] }}
-      className="bg-white/[0.03] border border-white/[0.07] rounded-2xl p-4 sm:p-5 relative overflow-hidden"
+      className="glass sheen lift rounded-[var(--r-md)] relative p-4 sm:p-5 relative overflow-hidden"
     >
       <div className="absolute left-0 top-0 bottom-0 w-[3px]" style={{ background: t.color, opacity: 0.7 }} />
       <div className="flex items-start gap-3.5 pl-1.5">

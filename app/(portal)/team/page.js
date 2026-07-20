@@ -23,7 +23,7 @@ function DoctorCard({ doctor, onEdit, onManage, onDeactivate }) {
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -10 }}
-      className="bg-white/[0.03] border border-white/[0.07] rounded-2xl p-5 flex items-start justify-between gap-4"
+      className="glass sheen rounded-[var(--r-md)] relative p-5 flex items-start justify-between gap-4"
     >
       <div className="flex items-start gap-4">
         <div className="w-10 h-10 rounded-full bg-[#00e5b0]/10 border border-[#00e5b0]/20 flex items-center justify-center text-[#00e5b0] font-bold text-[15px] shrink-0">
@@ -96,7 +96,7 @@ function DoctorModal({ doctor, onSave, onClose }) {
       <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
         className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40" onClick={onClose} />
       <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }}
-        className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[480px] bg-[#0e1c22] border border-white/[0.09] rounded-2xl z-50 p-6 shadow-2xl">
+        className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[480px] glass-strong sheen border border-white/[0.09] rounded-2xl z-50 p-6 shadow-2xl">
         <h2 className="text-white font-bold text-[16px] mb-5">{isEdit ? 'Edit Doctor' : 'Add Doctor'}</h2>
         <div className="space-y-4">
           {[
@@ -214,7 +214,7 @@ function ManagePanel({ doctor, onClose }) {
       <motion.div
         initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }}
         transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
-        className="fixed right-0 top-0 h-full w-[560px] bg-[#0e1c22] border-l border-white/[0.08] z-50 flex flex-col overflow-hidden"
+        className="fixed right-0 top-0 h-full w-[560px] glass-strong sheen border-l border-white/[0.08] z-50 flex flex-col overflow-hidden"
       >
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-5 border-b border-white/[0.06] shrink-0">
@@ -246,7 +246,7 @@ function ManagePanel({ doctor, onClose }) {
                 <p className="text-white/20 text-sm">Loading…</p>
               ) : (
                 schedule.map((row, i) => (
-                  <div key={i} className="bg-white/[0.03] border border-white/[0.06] rounded-xl p-4">
+                  <div key={i} className="bg-white/[0.03] border border-white/[0.07] backdrop-blur-xl rounded-xl relative p-4">
                     <div className="flex items-center justify-between mb-3">
                       <p className="text-white font-medium text-[13px]">{DAYS[i]}</p>
                       <label className="flex items-center gap-2 cursor-pointer">
@@ -296,7 +296,7 @@ function ManagePanel({ doctor, onClose }) {
               </button>
 
               {addLeave && (
-                <div className="bg-white/[0.03] border border-white/[0.08] rounded-xl p-4 space-y-3">
+                <div className="bg-white/[0.03] border border-white/[0.07] backdrop-blur-xl rounded-xl relative p-4 space-y-3">
                   <p className="text-white/70 text-[13px] font-medium">New Leave</p>
                   <div>
                     <p className="text-white/30 text-[11px] mb-1">Date *</p>
@@ -349,7 +349,7 @@ function ManagePanel({ doctor, onClose }) {
                 <p className="text-white/20 text-[13px] text-center py-6">No leaves scheduled</p>
               ) : (
                 leaves.map(lv => (
-                  <div key={lv.id} className="flex items-center justify-between bg-white/[0.03] border border-white/[0.06] rounded-xl px-4 py-3">
+                  <div key={lv.id} className="flex items-center justify-between bg-white/[0.03] border border-white/[0.07] backdrop-blur-xl rounded-xl relative px-4 py-3">
                     <div>
                       <p className="text-white text-[13px] font-medium">
                         {new Date(lv.leave_date + 'T00:00').toLocaleDateString('en-AE', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}

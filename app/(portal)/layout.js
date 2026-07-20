@@ -230,7 +230,11 @@ export default function PortalLayout({ children }) {
       <div className="flex h-screen overflow-hidden">
         {/* Sidebar — floating glass rail */}
         <aside className="w-[236px] shrink-0 p-3">
-          <div className="glass sheen rounded-[var(--r-lg)] h-full flex flex-col overflow-hidden">
+          {/* No overflow-hidden here: the notification dropdown (rendered inside
+              this rail) must be able to extend past the sidebar edge. The rail's
+              own glass bg/border already respect the border-radius, and all inner
+              content is inset by padding, so the rounded corners stay clean. */}
+          <div className="glass sheen rounded-[var(--r-lg)] h-full flex flex-col">
             {/* Logo */}
             <div className="px-4 pt-6 pb-5">
               <div className="flex items-center justify-between">

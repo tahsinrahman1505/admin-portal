@@ -5,14 +5,23 @@
    Obsidian base · a slow living aurora behind frosted-glass surfaces ·
    specular edge-lighting · a spring-physics motion vocabulary.
    Authored dark-first; every colour is a token so the whole system can be
-   retuned from here.
+   retuned from here. LIGHT MODE is a first-class second theme (not an
+   afterthought): the same aurora + glass language, re-tuned to a luminous
+   base — see the :root[data-theme="light"] block below. The theme is applied
+   by data-theme on <html> (default dark; public/theme-init.js sets it before
+   paint), and ThemeToggle flips it.
    ═══════════════════════════════════════════════════════════════════════════ */
 
-:root {
+:root,
+:root[data-theme="dark"] {
   /* Base ---------------------------------------------------------------- */
   --bg-base: #05070a;          /* obsidian, faintly blue-black */
   --background: #05070a;
   --foreground: #eef1f6;
+  --color-white: #ffffff;      /* the foreground ink behind every white/[opacity] utility */
+  --aurora-strength: 1;        /* multiplier on the aurora blob opacities */
+  --scrollbar-thumb: rgba(255,255,255,0.10);
+  --vignette: rgba(5,7,10,0.55);
 
   /* Aurora palette (the drifting light behind the glass) ---------------- */
   --aurora-teal:   #00e5b0;
@@ -54,6 +63,51 @@
   --color-foreground: var(--foreground);
 }
 
+/* ── LIGHT THEME ─────────────────────────────────────────────────────────────
+   Same aurora + glass language, re-tuned to a luminous base. The glass becomes
+   frosted WHITE (opaque enough to read on a light ground), the ink flips to
+   near-black, and --color-white flips too so every white/[opacity] utility in
+   the pages inverts to a dark tint automatically — no per-page rewrite. The
+   aurora is softened (--aurora-strength) so it's a pastel wash, not a glare. */
+:root[data-theme="light"] {
+  --bg-base: #eef1f7;          /* soft luminous off-white, faint cool cast */
+  --background: #eef1f7;
+  --foreground: #101317;
+  --color-white: #0d1117;      /* inverts white/[opacity] surfaces + text to dark */
+  --aurora-strength: 0.5;      /* halve the aurora so light mode stays calm */
+  --scrollbar-thumb: rgba(0,0,0,0.16);
+  --vignette: rgba(226,230,238,0.6);
+
+  /* Aurora tints — lighter, so the wash reads on a bright ground */
+  --aurora-teal:   #34e3bf;
+  --aurora-cyan:   #5fd6ef;
+  --aurora-violet: #9d84ff;
+
+  /* Frosted white glass */
+  --glass-bg:        rgba(255, 255, 255, 0.58);
+  --glass-bg-strong: rgba(255, 255, 255, 0.78);
+  --glass-border:    rgba(16, 19, 23, 0.08);
+  --glass-edge:      rgba(255, 255, 255, 0.9);   /* bright specular on white glass */
+
+  /* Ink flips to near-black at the same opacity stops */
+  --ink-1: rgba(16, 19, 23, 0.92);
+  --ink-2: rgba(16, 19, 23, 0.60);
+  --ink-3: rgba(16, 19, 23, 0.42);
+  --ink-4: rgba(16, 19, 23, 0.24);
+
+  /* Softer shadows on a light ground */
+  --shadow-sm: 0 1px 2px rgba(16,19,23,0.06);
+  --shadow-md: 0 8px 30px rgba(16,19,23,0.10), 0 2px 8px rgba(16,19,23,0.06);
+  --shadow-lg: 0 24px 60px rgba(16,19,23,0.14), 0 8px 24px rgba(16,19,23,0.08);
+  --glow-accent: 0 0 0 1px rgba(0,145,110,0.22), 0 8px 30px rgba(0,145,110,0.14);
+}
+
+/* The brand mint reads well on obsidian but fails contrast as text on light.
+   Arbitrary-value classes can't be re-tokenised, so match by class substring
+   (specificity beats the utility) and darken only TEXT usages; mint fills and
+   borders stay mint and still look right on the light ground. */
+:root[data-theme="light"] [class*="text-[#00e5b0]"] { color: #00916e; }
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -68,6 +122,7 @@ body {
   font-family: var(--font-jakarta), system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
+  transition: background-color 0.3s var(--ease-out), color 0.3s var(--ease-out);
 }
 
 * { box-sizing: border-box; }
@@ -127,13 +182,13 @@ body {
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb {
-  background: rgba(255,255,255,0.10);
+  background: var(--scrollbar-thumb);
   border-radius: 99px;
   transition: background 0.2s;
 }
 ::-webkit-scrollbar-thumb:hover { background: rgba(0,229,176,0.5); }
 ::-webkit-scrollbar-corner { background: transparent; }
-* { scrollbar-width: thin; scrollbar-color: rgba(255,255,255,0.10) transparent; }
+* { scrollbar-width: thin; scrollbar-color: var(--scrollbar-thumb) transparent; }
 
 /* ── Aurora drift ───────────────────────────────────────────────────────────
    Three blurred colour fields orbit slowly on the GPU (transform + opacity

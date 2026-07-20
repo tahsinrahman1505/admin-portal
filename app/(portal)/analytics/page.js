@@ -99,7 +99,7 @@ function buildHourBuckets(msgs) {
 function CustomTooltip({ active, payload, label }) {
   if (!active || !payload?.length) return null
   return (
-    <div className="bg-[#111c22] border border-white/[0.08] rounded-xl px-3.5 py-2.5 shadow-xl">
+    <div className="glass-strong sheen border border-white/[0.08] rounded-xl px-3.5 py-2.5 shadow-xl">
       <p className="text-white/40 text-[10.5px] mb-1.5" style={{ fontFamily: 'var(--font-jakarta)' }}>{label}</p>
       {payload.map((p, i) => (
         <p key={i} className="text-[12px] font-semibold" style={{ color: p.color, fontFamily: 'var(--font-jakarta)' }}>
@@ -117,7 +117,7 @@ function StatCard({ label, value, sub, delay = 0 }) {
       initial={{ opacity: 0, y: 14 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.45, delay, ease: [0.16, 1, 0.3, 1] }}
-      className="bg-white/[0.03] border border-white/[0.07] rounded-2xl px-5 py-4"
+      className="glass sheen rounded-[var(--r-md)] relative px-5 py-4"
     >
       <p className="text-white/35 text-[11.5px] mb-1" style={{ fontFamily: 'var(--font-jakarta)' }}>{label}</p>
       <p className="text-white font-extrabold text-[1.6rem] leading-none tracking-tight" style={{ fontFamily: 'var(--font-jakarta)' }}>{value}</p>
@@ -133,7 +133,7 @@ function ChartCard({ title, subtitle, children, delay = 0 }) {
       initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5, delay, ease: [0.16, 1, 0.3, 1] }}
-      className="bg-white/[0.03] border border-white/[0.07] rounded-2xl p-5"
+      className="glass sheen rounded-[var(--r-md)] relative p-5"
     >
       <div className="mb-5">
         <p className="text-white font-semibold text-[14px]" style={{ fontFamily: 'var(--font-jakarta)' }}>{title}</p>
@@ -288,7 +288,7 @@ export default function AnalyticsPage() {
         initial={{ opacity: 0, y: 16 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5, delay: 0.4, ease: [0.16, 1, 0.3, 1] }}
-        className="mt-4 bg-white/[0.03] border border-white/[0.07] rounded-2xl p-5"
+        className="mt-4 glass sheen rounded-[var(--r-md)] relative p-5"
       >
         <div className="mb-5">
           <p className="text-white font-semibold text-[14px]" style={{ fontFamily: 'var(--font-jakarta)' }}>
@@ -301,7 +301,7 @@ export default function AnalyticsPage() {
 
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
           {/* Bot response time */}
-          <div className="bg-white/[0.03] border border-white/[0.05] rounded-xl px-4 py-3.5">
+          <div className="bg-white/[0.03] border border-white/[0.07] backdrop-blur-xl rounded-xl relative px-4 py-3.5">
             <div className="flex items-center gap-2 mb-2">
               <div className="w-2 h-2 rounded-full bg-[#00e5b0]" />
               <p className="text-[11px] text-white/35 uppercase tracking-wider font-medium" style={{ fontFamily: 'var(--font-jakarta)' }}>
@@ -317,7 +317,7 @@ export default function AnalyticsPage() {
           </div>
 
           {/* Human response time */}
-          <div className="bg-white/[0.03] border border-white/[0.05] rounded-xl px-4 py-3.5">
+          <div className="bg-white/[0.03] border border-white/[0.07] backdrop-blur-xl rounded-xl relative px-4 py-3.5">
             <div className="flex items-center gap-2 mb-2">
               <div className="w-2 h-2 rounded-full bg-indigo-400" />
               <p className="text-[11px] text-white/35 uppercase tracking-wider font-medium" style={{ fontFamily: 'var(--font-jakarta)' }}>
@@ -333,7 +333,7 @@ export default function AnalyticsPage() {
           </div>
 
           {/* Bot reply count */}
-          <div className="bg-white/[0.03] border border-white/[0.05] rounded-xl px-4 py-3.5">
+          <div className="bg-white/[0.03] border border-white/[0.07] backdrop-blur-xl rounded-xl relative px-4 py-3.5">
             <div className="flex items-center gap-2 mb-2">
               <div className="w-2 h-2 rounded-full bg-white/20" />
               <p className="text-[11px] text-white/35 uppercase tracking-wider font-medium" style={{ fontFamily: 'var(--font-jakarta)' }}>
@@ -349,7 +349,7 @@ export default function AnalyticsPage() {
           </div>
 
           {/* Handoff count */}
-          <div className="bg-white/[0.03] border border-white/[0.05] rounded-xl px-4 py-3.5">
+          <div className="bg-white/[0.03] border border-white/[0.07] backdrop-blur-xl rounded-xl relative px-4 py-3.5">
             <div className="flex items-center gap-2 mb-2">
               <div className="w-2 h-2 rounded-full bg-amber-400" />
               <p className="text-[11px] text-white/35 uppercase tracking-wider font-medium" style={{ fontFamily: 'var(--font-jakarta)' }}>

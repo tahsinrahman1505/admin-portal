@@ -106,7 +106,7 @@ export default function SettingsPage() {
         </div>
 
         {/* Toggles */}
-        <div className="bg-white/[0.02] border border-white/[0.07] rounded-2xl divide-y divide-white/[0.05]">
+        <div className="glass sheen rounded-[var(--r-md)] relative divide-y divide-white/[0.05]">
           {[
             { key: 'booking_enabled',              label: 'Booking feature',         desc: 'Allow the bot to book appointments' },
             { key: 'lead_qualification_enabled',   label: 'Lead qualification flow', desc: 'Collect name, phone, service interest and budget' },
@@ -132,7 +132,7 @@ export default function SettingsPage() {
         </div>
 
         {/* Google Calendar connect */}
-        <div className="bg-white/[0.02] border border-white/[0.07] rounded-2xl px-5 py-4">
+        <div className="glass sheen rounded-[var(--r-md)] relative px-5 py-4">
           <div className="flex items-center justify-between gap-4">
             <div className="min-w-0">
               <p className="text-[13.5px] font-medium text-white/80">Google Calendar</p>

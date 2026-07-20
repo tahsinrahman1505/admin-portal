@@ -113,7 +113,7 @@ function BookingFormModal({ open, onClose, onSubmit, initial, saving }) {
       <motion.div
         initial={{ opacity: 0, scale: 0.96, y: 10 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.96 }}
         transition={{ duration: 0.2 }}
-        className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[440px] max-w-[92vw] bg-[#0e1c22] border border-white/[0.08] rounded-2xl z-50 overflow-hidden"
+        className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[440px] max-w-[92vw] glass-strong sheen border border-white/[0.08] rounded-2xl z-50 overflow-hidden"
       >
         <div className="flex items-center justify-between px-6 py-4 border-b border-white/[0.06]">
           <p className="text-white font-semibold text-[14px]">{initial ? 'Edit booking' : 'New booking'}</p>
@@ -191,7 +191,7 @@ function BookingDrawer({ booking, risk, onClose, onEdit, onCancel, busy }) {
       <motion.div
         initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }}
         transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
-        className="fixed right-0 top-0 h-full w-[360px] bg-[#0e1c22] border-l border-white/[0.08] z-50 flex flex-col"
+        className="fixed right-0 top-0 h-full w-[360px] glass-strong sheen border-l border-white/[0.08] z-50 flex flex-col"
       >
         <div className="flex items-center justify-between px-6 py-5 border-b border-white/[0.06]">
           <p className="text-white font-semibold text-[14px]">{patientName(booking)}</p>
@@ -570,7 +570,7 @@ export default function BookingsPage() {
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.3 }}
-        className="bg-white/[0.02] border border-white/[0.07] rounded-2xl overflow-hidden"
+        className="glass sheen rounded-[var(--r-md)] relative overflow-hidden"
       >
         {view === 'calendar' ? CalendarView : ListViewEl}
       </motion.div>

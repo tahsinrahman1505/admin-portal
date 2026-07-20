@@ -95,7 +95,7 @@ function ChannelCard({ ch, config, stats, saving, onToggle, onConfigChange, onSa
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.45, delay: 0.08 + index * 0.1, ease: [0.16, 1, 0.3, 1] }}
-      className="rounded-2xl border overflow-hidden"
+      className="rounded-2xl border overflow-hidden backdrop-blur-xl"
       style={{
         background: isEnabled ? ch.bg : 'rgba(255,255,255,0.015)',
         borderColor: isEnabled ? ch.border : 'rgba(255,255,255,0.06)',
@@ -146,8 +146,7 @@ function ChannelCard({ ch, config, stats, saving, onToggle, onConfigChange, onSa
 
         {/* Stats row */}
         <div
-          className="grid grid-cols-3 gap-2 py-4 rounded-xl mb-0"
-          style={{ background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.04)' }}
+          className="grid grid-cols-3 gap-2 py-4 rounded-xl mb-0 bg-white/[0.03] border border-white/[0.07] backdrop-blur-xl relative"
         >
           <StatPill value={stats?.messages?.toLocaleString()} label="Messages" color={isEnabled ? ch.color : 'rgba(255,255,255,0.3)'} />
           <div className="w-px bg-white/[0.05]" />
@@ -299,7 +298,7 @@ function SummaryBar({ allStats, channelConfigs }) {
       initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
-      className="bg-white/[0.025] border border-white/[0.07] rounded-2xl p-5 mb-6 relative overflow-hidden"
+      className="glass sheen rounded-[var(--r-md)] p-5 mb-6 relative overflow-hidden"
     >
       <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-[#00e5b0]/25 to-transparent" />
       <div className="flex flex-wrap items-center gap-6">

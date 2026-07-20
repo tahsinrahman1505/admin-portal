@@ -697,7 +697,7 @@ export default function ConversationsPage() {
       </div>
 
       {/* ── Chat panel ── */}
-      <div className="flex-1 flex flex-col overflow-hidden bg-[#080808]">
+      <div className="flex-1 flex flex-col overflow-hidden glass-strong sheen">
         {!selected ? (
           <div className="flex items-center justify-center h-full text-white/20 text-sm">
             Select a conversation to view
@@ -754,7 +754,7 @@ export default function ConversationsPage() {
               </div>
 
               {summary && (
-                <div className="mx-6 mb-4 bg-white/[0.03] border border-white/[0.07] rounded-xl px-4 py-3 flex gap-3">
+                <div className="mx-6 mb-4 glass sheen rounded-xl relative px-4 py-3 flex gap-3">
                   <span className="text-[#00e5b0] text-[14px] shrink-0 mt-0.5">✦</span>
                   <div className="flex-1 min-w-0">
                     <p className="text-[11px] text-[#00e5b0] font-semibold uppercase tracking-wider mb-1.5">AI Summary</p>

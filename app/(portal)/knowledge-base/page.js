@@ -1,5 +1,8 @@
 'use client'
 import { useState, useEffect, useRef } from 'react'
+import { motion } from 'framer-motion'
+import { rise } from '@/lib/motion'
+import { StaggerGroup } from '@/components/glass/Glass'
 
 // API calls go through server-side proxy routes so the secret never hits the browser
 const FASTAPI_URL  = '/api/rag'
@@ -137,9 +140,9 @@ export default function KnowledgeBasePage() {
         ) : documents.length === 0 ? (
           <div className="text-center py-14 text-white/15 text-[13px]">No documents uploaded yet.</div>
         ) : (
-          <div className="space-y-2">
+          <StaggerGroup className="space-y-2">
             {documents.map(doc => (
-              <div key={doc.id} className="flex items-center justify-between px-5 py-4 bg-white/[0.025] border border-white/[0.06] rounded-2xl hover:bg-white/[0.04] transition-colors">
+              <motion.div key={doc.id} variants={rise} className="flex items-center justify-between px-5 py-4 bg-white/[0.03] border border-white/[0.07] backdrop-blur-xl rounded-2xl relative hover:bg-white/[0.04] transition-colors">
                 <div className="flex items-center gap-4">
                   <div className="w-9 h-9 bg-white/[0.04] rounded-xl flex items-center justify-center text-[13px]">
                     {doc.filename?.endsWith('.pdf') ? '📕' : '📄'}
@@ -159,9 +162,9 @@ export default function KnowledgeBasePage() {
                     Delete
                   </button>
                 </div>
-              </div>
+              </motion.div>
             ))}
-          </div>
+          </StaggerGroup>
         )}
       </div>
     </div>

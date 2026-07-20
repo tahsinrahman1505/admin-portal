@@ -280,7 +280,7 @@ export default function PatientsPage() {
               animate={{ x: 0 }}
               exit={{ x: '100%' }}
               transition={{ duration: 0.32, ease: [0.16, 1, 0.3, 1] }}
-              className="fixed right-0 top-0 h-full w-[420px] glass-strong sheen border-l border-white/[0.08] z-50 flex flex-col shadow-2xl"
+              className="fixed right-0 top-0 h-full w-[420px] glass-overlay sheen border-l border-white/[0.08] z-50 flex flex-col shadow-2xl"
             >
               {/* Drawer header */}
               <div className="flex items-center justify-between px-6 py-5 border-b border-white/[0.06]">

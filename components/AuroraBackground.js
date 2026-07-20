@@ -20,7 +20,7 @@ export default function AuroraBackground() {
         style={{
           width: '58vw', height: '58vw', left: '-14vw', bottom: '-20vw',
           background: 'radial-gradient(circle at center, var(--aurora-teal) 0%, transparent 62%)',
-          filter: 'blur(90px)', opacity: 0.55,
+          filter: 'blur(90px)', opacity: 'calc(0.55 * var(--aurora-strength, 1))',
           animation: 'aurora-drift-a 26s ease-in-out infinite, aurora-breathe 14s ease-in-out infinite',
         }}
       />
@@ -30,7 +30,7 @@ export default function AuroraBackground() {
         style={{
           width: '52vw', height: '52vw', right: '-16vw', top: '-18vw',
           background: 'radial-gradient(circle at center, var(--aurora-violet) 0%, transparent 60%)',
-          filter: 'blur(100px)', opacity: 0.42,
+          filter: 'blur(100px)', opacity: 'calc(0.42 * var(--aurora-strength, 1))',
           animation: 'aurora-drift-b 32s ease-in-out infinite, aurora-breathe 18s ease-in-out infinite',
         }}
       />
@@ -40,7 +40,7 @@ export default function AuroraBackground() {
         style={{
           width: '44vw', height: '44vw', left: '38vw', top: '30vh',
           background: 'radial-gradient(circle at center, var(--aurora-cyan) 0%, transparent 64%)',
-          filter: 'blur(110px)', opacity: 0.30,
+          filter: 'blur(110px)', opacity: 'calc(0.30 * var(--aurora-strength, 1))',
           animation: 'aurora-drift-c 38s ease-in-out infinite',
         }}
       />
@@ -53,10 +53,10 @@ export default function AuroraBackground() {
             "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E\")",
         }}
       />
-      {/* vignette — settle the edges so content floats */}
+      {/* vignette — settle the edges so content floats (theme-aware) */}
       <div
         className="absolute inset-0"
-        style={{ background: 'radial-gradient(ellipse at 50% 40%, transparent 40%, rgba(5,7,10,0.55) 100%)' }}
+        style={{ background: 'radial-gradient(ellipse at 50% 40%, transparent 40%, var(--vignette) 100%)' }}
       />
     </div>
   )

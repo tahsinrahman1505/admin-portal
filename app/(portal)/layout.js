@@ -9,6 +9,7 @@ import RealtimeToast from '@/components/RealtimeToast'
 import NotificationBell from '@/components/NotificationBell'
 import AuroraBackground from '@/components/AuroraBackground'
 import CommandPalette from '@/components/CommandPalette'
+import ThemeToggle from '@/components/ThemeToggle'
 
 /* Nav row with a shared-layout active pill: the highlight physically slides
    from the old item to the new one on navigation (layoutId), instead of just
@@ -286,6 +287,7 @@ export default function PortalLayout({ children }) {
               <p className="text-[11px] text-[var(--ink-3)] px-1 mb-2.5 truncate" style={{ fontFamily: 'var(--font-jakarta)' }}>
                 {userEmail}
               </p>
+              <div className="mb-1"><ThemeToggle /></div>
               <button
                 onClick={handleLogout}
                 className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-[13px] text-[var(--ink-2)] hover:text-red-400 hover:bg-red-400/[0.08] transition-all duration-200"

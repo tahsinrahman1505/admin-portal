@@ -588,29 +588,35 @@ export default function ChannelsPage() {
       waMsgListenerRef.current = onMsg
       window.addEventListener('message', onMsg)
 
-      FB.login(async (response) => {
+      // The Facebook SDK validates its callback is a plain function (rejects
+      // an async function passed directly — "Expression is of type
+      // AsyncFunction, not Function"). Keep this outer callback synchronous;
+      // the async work runs in an inner IIFE instead.
+      FB.login((response) => {
         const code = response?.authResponse?.code
         if (!code) {
           setWaBusy(false)
           setWaError('Connection was cancelled or did not complete.')
           return
         }
-        try {
-          const res = await fetch('/api/meta/whatsapp/connect', {
-            method: 'POST',
-            headers: { 'content-type': 'application/json' },
-            body: JSON.stringify({ code }),
-          })
-          const data = await res.json()
-          if (!res.ok || !data.ok) throw new Error(data.error || 'Connect failed')
-          await loadWaStatus()
-          setSavedFlash('whatsapp')
-          setTimeout(() => setSavedFlash(null), 2500)
-        } catch (e) {
-          setWaError(String(e?.message || e))
-        } finally {
-          setWaBusy(false)
-        }
+        ;(async () => {
+          try {
+            const res = await fetch('/api/meta/whatsapp/connect', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({ code }),
+            })
+            const data = await res.json()
+            if (!res.ok || !data.ok) throw new Error(data.error || 'Connect failed')
+            await loadWaStatus()
+            setSavedFlash('whatsapp')
+            setTimeout(() => setSavedFlash(null), 2500)
+          } catch (e) {
+            setWaError(String(e?.message || e))
+          } finally {
+            setWaBusy(false)
+          }
+        })()
       }, {
         config_id: META_WA_CONFIG_ID,
         response_type: 'code',

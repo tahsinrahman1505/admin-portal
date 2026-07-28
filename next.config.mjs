@@ -28,11 +28,18 @@ const nextConfig = {
             // 'unsafe-inline' required by Next.js inline scripts/styles in production.
             value: [
               "default-src 'self'",
-              "script-src 'self' 'unsafe-inline' 'unsafe-eval'",  // unsafe-eval needed by Next.js
+              // connect.facebook.net: the Meta JS SDK, needed for the Connect
+              // WhatsApp (Embedded Signup) button on the Channels page.
+              "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://connect.facebook.net",
               "style-src 'self' 'unsafe-inline'",
-              "img-src 'self' data: blob:",
+              "img-src 'self' data: blob: https://*.fbcdn.net",
               "font-src 'self' data:",
-              "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://n8n.mdtahsinrahman.com",
+              // graph.facebook.com + www.facebook.com: the FB SDK's own runtime
+              // calls during the Embedded Signup popup flow.
+              "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://n8n.mdtahsinrahman.com https://graph.facebook.com https://www.facebook.com",
+              // The FB SDK uses a hidden iframe for session/cookie checks
+              // separate from the FB.login() popup itself.
+              "frame-src https://www.facebook.com https://staticxx.facebook.com",
               frameAncestors,
               "base-uri 'self'",
               "form-action 'self'",

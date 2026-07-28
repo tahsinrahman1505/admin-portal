@@ -1,9 +1,35 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import { supabase } from '@/lib/supabase'
+
+// ─── Meta Embedded Signup (WhatsApp) ────────────────────────────────────────
+// Loads the FB JS SDK once and exposes a promise that resolves when window.FB
+// is ready. Popup-based — never navigates the page away, so no redirect/nonce
+// flow is needed (unlike the Google Calendar connect); the existing
+// sb-portal-session cookie already authenticates the code-exchange POST.
+const META_APP_ID = process.env.NEXT_PUBLIC_META_APP_ID || ''
+const META_WA_CONFIG_ID = process.env.NEXT_PUBLIC_META_WA_CONFIG_ID || ''
+let fbSdkPromise = null
+function loadFacebookSdk() {
+  if (fbSdkPromise) return fbSdkPromise
+  fbSdkPromise = new Promise((resolve) => {
+    if (typeof window === 'undefined') return resolve(null)
+    if (window.FB) return resolve(window.FB)
+    window.fbAsyncInit = function () {
+      window.FB.init({ appId: META_APP_ID, xfbml: false, version: 'v21.0' })
+      resolve(window.FB)
+    }
+    const el = document.createElement('script')
+    el.src = 'https://connect.facebook.net/en_US/sdk.js'
+    el.async = true
+    el.defer = true
+    document.body.appendChild(el)
+  })
+  return fbSdkPromise
+}
 
 // ─── Channel definitions ─────────────────────────────────────────────────────
 
@@ -86,7 +112,49 @@ function StatPill({ value, label, color }) {
 
 // ─── Channel card ─────────────────────────────────────────────────────────────
 
-function ChannelCard({ ch, config, stats, saving, onToggle, onConfigChange, onSave, index }) {
+// Connection status/action row — WhatsApp only for now (Instagram/Messenger
+// connect is a planned follow-up using the same pattern with a different
+// Meta config_id + permission set). Deliberately separate from the feature
+// Toggle below: this answers "is it wired to Meta at all", the Toggle answers
+// "should the bot actively use it".
+function ConnectionRow({ ch, waStatus, waBusy, onConnect, onDisconnect }) {
+  if (ch.key !== 'whatsapp') return null
+  if (waStatus === null) {
+    return <div className="h-8 rounded-lg bg-white/[0.03] animate-pulse mb-4" />
+  }
+  if (waStatus.connected) {
+    return (
+      <div className="flex items-center justify-between gap-3 px-3 py-2.5 rounded-xl bg-white/[0.03] border border-white/[0.06] mb-4">
+        <span className="text-[11.5px] text-white/50 flex items-center gap-1.5">
+          <svg viewBox="0 0 24 24" fill="none" stroke={ch.color} strokeWidth={2.5} className="w-3.5 h-3.5 shrink-0">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+          </svg>
+          Connected to Meta
+        </span>
+        <button
+          onClick={onDisconnect}
+          disabled={waBusy}
+          className="text-[11px] text-white/30 hover:text-white/60 transition-colors disabled:opacity-50"
+        >
+          Disconnect
+        </button>
+      </div>
+    )
+  }
+  return (
+    <button
+      onClick={onConnect}
+      disabled={waBusy || !META_APP_ID}
+      title={!META_APP_ID ? 'WhatsApp connect is not configured yet' : undefined}
+      className="w-full mb-4 py-2.5 rounded-xl text-[12.5px] font-semibold transition-opacity disabled:opacity-50 flex items-center justify-center gap-2"
+      style={{ background: `${ch.color}18`, color: ch.color, border: `1px solid ${ch.color}30` }}
+    >
+      {waBusy ? 'Connecting…' : 'Connect WhatsApp'}
+    </button>
+  )
+}
+
+function ChannelCard({ ch, config, stats, saving, onToggle, onConfigChange, onSave, index, waStatus, waBusy, onConnectWhatsApp, onDisconnectWhatsApp }) {
   const isEnabled = config?.enabled ?? false
   const [expanded, setExpanded] = useState(false)
 
@@ -143,6 +211,8 @@ function ChannelCard({ ch, config, stats, saving, onToggle, onConfigChange, onSa
             <Toggle enabled={isEnabled} onChange={(val) => onToggle(ch.key, val)} color={ch.color} />
           </div>
         </div>
+
+        <ConnectionRow ch={ch} waStatus={waStatus} waBusy={waBusy} onConnect={onConnectWhatsApp} onDisconnect={onDisconnectWhatsApp} />
 
         {/* Stats row */}
         <div
@@ -353,6 +423,20 @@ export default function ChannelsPage() {
   const [allStats, setAllStats]           = useState({ whatsapp: {}, instagram: {}, messenger: {} })
   const [saving, setSaving]               = useState(null)   // channel key being saved
   const [savedFlash, setSavedFlash]       = useState(null)   // flash message per key
+  const [waStatus, setWaStatus]           = useState(null)   // { connected, wabaId, connectedAt } | null while loading
+  const [waBusy, setWaBusy]               = useState(false)
+  const [waError, setWaError]             = useState(null)
+  const waMsgListenerRef = useRef(null)
+
+  const loadWaStatus = useCallback(async () => {
+    try {
+      const res = await fetch('/api/meta/whatsapp/status')
+      const data = await res.json()
+      setWaStatus({ connected: Boolean(data.connected), wabaId: data.wabaId, connectedAt: data.connectedAt })
+    } catch {
+      setWaStatus({ connected: false, wabaId: null, connectedAt: null })
+    }
+  }, [])
 
   // ── Auth + load ────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -392,9 +476,13 @@ export default function ChannelsPage() {
 
       // Load per-channel stats in parallel
       await loadStats(cid)
+      await loadWaStatus()
       setLoading(false)
     }
     init()
+    return () => {
+      if (waMsgListenerRef.current) window.removeEventListener('message', waMsgListenerRef.current)
+    }
   }, [])
 
   const loadStats = useCallback(async (cid) => {
@@ -454,6 +542,83 @@ export default function ChannelsPage() {
     setSaving(null)
   }
 
+  // ── Connect WhatsApp (Meta Embedded Signup) ────────────────────────────────
+  async function handleConnectWhatsApp() {
+    if (waBusy) return
+    setWaBusy(true)
+    setWaError(null)
+    try {
+      const FB = await loadFacebookSdk()
+      if (!FB) throw new Error('Could not load Facebook SDK')
+
+      // The frontend's WA_EMBEDDED_SIGNUP message event carries phone_number_id /
+      // waba_id too, but we deliberately don't use them for anything beyond an
+      // optional UI hint — the backend independently re-derives and verifies
+      // both from the exchanged token itself before storing anything.
+      if (waMsgListenerRef.current) window.removeEventListener('message', waMsgListenerRef.current)
+      const onMsg = (event) => {
+        if (event.origin !== 'https://www.facebook.com' && event.origin !== 'https://web.facebook.com') return
+        try {
+          const data = JSON.parse(event.data)
+          if (data.type === 'WA_EMBEDDED_SIGNUP' && data.event === 'CANCEL') {
+            setWaBusy(false)
+            setWaError('Connection cancelled.')
+          }
+        } catch { /* not our message */ }
+      }
+      waMsgListenerRef.current = onMsg
+      window.addEventListener('message', onMsg)
+
+      FB.login(async (response) => {
+        const code = response?.authResponse?.code
+        if (!code) {
+          setWaBusy(false)
+          setWaError('Connection was cancelled or did not complete.')
+          return
+        }
+        try {
+          const res = await fetch('/api/meta/whatsapp/connect', {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ code }),
+          })
+          const data = await res.json()
+          if (!res.ok || !data.ok) throw new Error(data.error || 'Connect failed')
+          await loadWaStatus()
+          setSavedFlash('whatsapp')
+          setTimeout(() => setSavedFlash(null), 2500)
+        } catch (e) {
+          setWaError(String(e?.message || e))
+        } finally {
+          setWaBusy(false)
+        }
+      }, {
+        config_id: META_WA_CONFIG_ID,
+        response_type: 'code',
+        override_default_response_type: true,
+      })
+    } catch (e) {
+      setWaBusy(false)
+      setWaError(String(e?.message || e))
+    }
+  }
+
+  async function handleDisconnectWhatsApp() {
+    if (waBusy) return
+    setWaBusy(true)
+    setWaError(null)
+    try {
+      const res = await fetch('/api/meta/whatsapp/disconnect', { method: 'POST' })
+      const data = await res.json()
+      if (!res.ok || !data.ok) throw new Error(data.error || 'Disconnect failed')
+      await loadWaStatus()
+    } catch (e) {
+      setWaError(String(e?.message || e))
+    } finally {
+      setWaBusy(false)
+    }
+  }
+
   // ── Loading state ──────────────────────────────────────────────────────────
   if (loading) {
     return (
@@ -509,6 +674,23 @@ export default function ChannelsPage() {
         )}
       </AnimatePresence>
 
+      {/* WhatsApp connect error banner */}
+      <AnimatePresence>
+        {waError && (
+          <motion.div
+            key="wa-error"
+            initial={{ opacity: 0, y: -8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.22 }}
+            className="mb-4 flex items-center justify-between gap-2 px-4 py-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-300 text-[13px] font-medium"
+          >
+            <span>{waError}</span>
+            <button onClick={() => setWaError(null)} className="text-red-300/50 hover:text-red-300 shrink-0">✕</button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Channel cards */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         {CHANNELS.map((ch, i) => (
@@ -522,6 +704,10 @@ export default function ChannelsPage() {
             onToggle={handleToggle}
             onConfigChange={handleConfigChange}
             onSave={handleSave}
+            waStatus={ch.key === 'whatsapp' ? waStatus : undefined}
+            waBusy={waBusy}
+            onConnectWhatsApp={handleConnectWhatsApp}
+            onDisconnectWhatsApp={handleDisconnectWhatsApp}
           />
         ))}
       </div>

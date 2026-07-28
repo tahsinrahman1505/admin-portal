@@ -18,7 +18,25 @@ function loadFacebookSdk() {
   fbSdkPromise = new Promise((resolve) => {
     if (typeof window === 'undefined') return resolve(null)
     if (window.FB) return resolve(window.FB)
+
+    // Never hang forever: if the script fails to load (network blip, ad
+    // blocker, firewall) or just never calls back, resolve(null) instead of
+    // leaving the caller's "Connecting…" state stuck indefinitely. A failed
+    // attempt also clears the module-level cache so the NEXT click retries
+    // loading the script instead of returning the same dead promise forever.
+    let settled = false
+    const fail = () => {
+      if (settled) return
+      settled = true
+      fbSdkPromise = null
+      resolve(null)
+    }
+    const timeoutId = setTimeout(fail, 10000)
+
     window.fbAsyncInit = function () {
+      if (settled) return
+      settled = true
+      clearTimeout(timeoutId)
       window.FB.init({ appId: META_APP_ID, xfbml: false, version: 'v21.0' })
       resolve(window.FB)
     }
@@ -26,6 +44,7 @@ function loadFacebookSdk() {
     el.src = 'https://connect.facebook.net/en_US/sdk.js'
     el.async = true
     el.defer = true
+    el.onerror = fail
     document.body.appendChild(el)
   })
   return fbSdkPromise

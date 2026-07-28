@@ -579,6 +579,10 @@ export default function ChannelsPage() {
         if (event.origin !== 'https://www.facebook.com' && event.origin !== 'https://web.facebook.com') return
         try {
           const data = JSON.parse(event.data)
+          // TEMP DIAGNOSTIC: log every message Meta's popup sends us, not just
+          // CANCEL — this is what tells us whether Meta signals completion via
+          // postMessage even when FB.login()'s own callback doesn't fire.
+          console.log('[WA Embedded Signup] postMessage:', data)
           if (data.type === 'WA_EMBEDDED_SIGNUP' && data.event === 'CANCEL') {
             setWaBusy(false)
             setWaError('Connection cancelled.')
@@ -593,6 +597,10 @@ export default function ChannelsPage() {
       // AsyncFunction, not Function"). Keep this outer callback synchronous;
       // the async work runs in an inner IIFE instead.
       FB.login((response) => {
+        // TEMP DIAGNOSTIC: prove whether this callback fires at all, and with
+        // what shape — the open question is whether Meta's Tech Provider /
+        // System-user-token config even returns authResponse.code here.
+        console.log('[WA Embedded Signup] FB.login callback fired:', response)
         const code = response?.authResponse?.code
         if (!code) {
           setWaBusy(false)

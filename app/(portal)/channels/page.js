@@ -756,6 +756,12 @@ export default function ChannelsPage() {
         })()
       }, {
         config_id: META_SOCIAL_CONFIG_ID,
+        // Facebook remembers a completed grant and skips straight to a
+        // one-click "reconnect" on repeat clicks — auth_type: 'rerequest'
+        // forces the full "Review access request" consent screen to show
+        // again even though the app is already authorized. Needed for
+        // App Review screencasts, which must capture that screen on camera.
+        auth_type: 'rerequest',
       })
     } catch (e) {
       setSocialBusy(false)

@@ -464,13 +464,17 @@ export default function ConversationsPage() {
 
   // ── Handoff check — now channel-aware ──
   function isHandedOff(thread) {
-    // Primary: check messages directly — conversations table is readable by anon,
-    // sessions table is RLS-blocked so handoffSessions is often empty.
-    const msgs = thread.messages || []
-    if (msgs.some(m => m.session_status === 'Handed Off')) return true
-    // Also check thread-level status (set from last message)
+    // Primary: the MOST RECENT message's status — a conversation that was
+    // ever handed off in the past (any earlier message) must not stay stuck
+    // reading as handed off forever after a resume; only the latest state
+    // matters. thread.status already tracks this (set from the last message
+    // on load, and kept current by the realtime INSERT/UPDATE handlers and
+    // the optimistic flips in handleResume/handleTakeover).
     if (thread.status === 'Handed Off') return true
-    // Fallback: sessions table check (works if RLS allows)
+    if (thread.status) return false
+    // Fallback for a thread with no status yet: sessions table check
+    // (conversations table is readable by anon; sessions is RLS-blocked so
+    // this is often empty, but still worth trying).
     const norm = normalizeIdentity(thread.sender_id || thread.phone)
     return handoffSessions.some(h => h.sender_id === norm)
   }

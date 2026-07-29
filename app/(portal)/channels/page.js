@@ -139,20 +139,41 @@ function StatPill({ value, label, color }) {
 // fields are populated. Deliberately separate from the feature Toggle below:
 // this answers "is it wired to Meta at all", the Toggle answers "should the
 // bot actively use it".
-function ConnectionRow({ ch, waStatus, waBusy, onConnect, onDisconnect, socialStatus }) {
+function ConnectionRow({ ch, waStatus, waBusy, onConnect, onDisconnect, socialStatus, socialBusy, onConnectSocial, onDisconnectSocial }) {
   if (ch.key === 'messenger' || ch.key === 'instagram') {
     const status = socialStatus?.[ch.key]
     if (!status) {
       return <div className="h-8 rounded-lg bg-white/[0.03] animate-pulse mb-4" />
     }
-    if (!status.connected) return null
+    if (status.connected) {
+      return (
+        <div className="flex items-center justify-between gap-3 px-3 py-2.5 rounded-xl bg-white/[0.03] border border-white/[0.06] mb-4">
+          <span className="text-[11.5px] text-white/50 flex items-center gap-1.5">
+            <svg viewBox="0 0 24 24" fill="none" stroke={ch.color} strokeWidth={2.5} className="w-3.5 h-3.5 shrink-0">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+            </svg>
+            Connected to Meta{ch.key === 'instagram' && status.username ? ` · @${status.username}` : ''}
+          </span>
+          <button
+            onClick={onDisconnectSocial}
+            disabled={socialBusy}
+            className="text-[11px] text-white/30 hover:text-white/60 transition-colors disabled:opacity-50"
+          >
+            Disconnect
+          </button>
+        </div>
+      )
+    }
     return (
-      <div className="flex items-center gap-1.5 px-3 py-2.5 rounded-xl bg-white/[0.03] border border-white/[0.06] mb-4 text-[11.5px] text-white/50">
-        <svg viewBox="0 0 24 24" fill="none" stroke={ch.color} strokeWidth={2.5} className="w-3.5 h-3.5 shrink-0">
-          <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
-        </svg>
-        Connected to Meta{ch.key === 'instagram' && status.username ? ` · @${status.username}` : ''}
-      </div>
+      <button
+        onClick={onConnectSocial}
+        disabled={socialBusy || !META_APP_ID}
+        title={!META_APP_ID ? 'Social connect is not configured yet' : undefined}
+        className="w-full mb-4 py-2.5 rounded-xl text-[12.5px] font-semibold transition-opacity disabled:opacity-50 flex items-center justify-center gap-2"
+        style={{ background: `${ch.color}18`, color: ch.color, border: `1px solid ${ch.color}30` }}
+      >
+        {socialBusy ? 'Connecting…' : `Connect ${ch.label}`}
+      </button>
     )
   }
 
@@ -192,7 +213,7 @@ function ConnectionRow({ ch, waStatus, waBusy, onConnect, onDisconnect, socialSt
   )
 }
 
-function ChannelCard({ ch, config, stats, saving, onToggle, onConfigChange, onSave, index, waStatus, waBusy, onConnectWhatsApp, onDisconnectWhatsApp, socialStatus }) {
+function ChannelCard({ ch, config, stats, saving, onToggle, onConfigChange, onSave, index, waStatus, waBusy, onConnectWhatsApp, onDisconnectWhatsApp, socialStatus, socialBusy, onConnectSocial, onDisconnectSocial }) {
   const isEnabled = config?.enabled ?? false
   const [expanded, setExpanded] = useState(false)
 
@@ -250,7 +271,7 @@ function ChannelCard({ ch, config, stats, saving, onToggle, onConfigChange, onSa
           </div>
         </div>
 
-        <ConnectionRow ch={ch} waStatus={waStatus} waBusy={waBusy} onConnect={onConnectWhatsApp} onDisconnect={onDisconnectWhatsApp} socialStatus={socialStatus} />
+        <ConnectionRow ch={ch} waStatus={waStatus} waBusy={waBusy} onConnect={onConnectWhatsApp} onDisconnect={onDisconnectWhatsApp} socialStatus={socialStatus} socialBusy={socialBusy} onConnectSocial={onConnectSocial} onDisconnectSocial={onDisconnectSocial} />
 
         {/* Stats row */}
         <div
@@ -465,6 +486,8 @@ export default function ChannelsPage() {
   const [waBusy, setWaBusy]               = useState(false)
   const [waError, setWaError]             = useState(null)
   const [socialStatus, setSocialStatus]   = useState(null)   // { messenger: {connected}, instagram: {connected} } | null while loading
+  const [socialBusy, setSocialBusy]       = useState(false)
+  const [socialError, setSocialError]     = useState(null)
   const waMsgListenerRef = useRef(null)
 
   const loadWaStatus = useCallback(async () => {
@@ -686,6 +709,70 @@ export default function ChannelsPage() {
     }
   }
 
+  // ── Connect Messenger + Instagram (Facebook Login for Business) ───────────
+  // Plain scope-based FB.login() — not the WhatsApp Embedded Signup product,
+  // so no config_id and no WA_EMBEDDED_SIGNUP postMessage listener needed.
+  // Both channels share one Page token, so one Connect grants both.
+  async function handleConnectSocial() {
+    if (socialBusy) return
+    setSocialBusy(true)
+    setSocialError(null)
+    try {
+      const FB = await loadFacebookSdk()
+      if (!FB) throw new Error('Could not load Facebook SDK')
+
+      FB.login((response) => {
+        const code = response?.authResponse?.code
+        if (!code) {
+          setSocialBusy(false)
+          setSocialError('Connection was cancelled or did not complete.')
+          return
+        }
+        ;(async () => {
+          try {
+            const res = await fetch('/api/meta/social/connect', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({ code }),
+            })
+            const data = await res.json()
+            if (!res.ok || !data.ok) throw new Error(data.error || 'Connect failed')
+            await loadSocialStatus()
+            setSavedFlash('messenger')
+            setTimeout(() => setSavedFlash(null), 2500)
+          } catch (e) {
+            setSocialError(String(e?.message || e))
+          } finally {
+            setSocialBusy(false)
+          }
+        })()
+      }, {
+        scope: 'pages_show_list,pages_messaging,pages_manage_metadata,business_management,instagram_business_basic,instagram_business_manage_messages',
+        response_type: 'code',
+        override_default_response_type: true,
+      })
+    } catch (e) {
+      setSocialBusy(false)
+      setSocialError(String(e?.message || e))
+    }
+  }
+
+  async function handleDisconnectSocial() {
+    if (socialBusy) return
+    setSocialBusy(true)
+    setSocialError(null)
+    try {
+      const res = await fetch('/api/meta/social/disconnect', { method: 'POST' })
+      const data = await res.json()
+      if (!res.ok || !data.ok) throw new Error(data.error || 'Disconnect failed')
+      await loadSocialStatus()
+    } catch (e) {
+      setSocialError(String(e?.message || e))
+    } finally {
+      setSocialBusy(false)
+    }
+  }
+
   // ── Loading state ──────────────────────────────────────────────────────────
   if (loading) {
     return (
@@ -758,6 +845,23 @@ export default function ChannelsPage() {
         )}
       </AnimatePresence>
 
+      {/* Messenger/Instagram connect error banner */}
+      <AnimatePresence>
+        {socialError && (
+          <motion.div
+            key="social-error"
+            initial={{ opacity: 0, y: -8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.22 }}
+            className="mb-4 flex items-center justify-between gap-2 px-4 py-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-300 text-[13px] font-medium"
+          >
+            <span>{socialError}</span>
+            <button onClick={() => setSocialError(null)} className="text-red-300/50 hover:text-red-300 shrink-0">✕</button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Channel cards */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         {CHANNELS.map((ch, i) => (
@@ -776,6 +880,9 @@ export default function ChannelsPage() {
             onConnectWhatsApp={handleConnectWhatsApp}
             onDisconnectWhatsApp={handleDisconnectWhatsApp}
             socialStatus={socialStatus}
+            socialBusy={socialBusy}
+            onConnectSocial={handleConnectSocial}
+            onDisconnectSocial={handleDisconnectSocial}
           />
         ))}
       </div>

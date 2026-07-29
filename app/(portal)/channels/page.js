@@ -12,6 +12,7 @@ import { supabase } from '@/lib/supabase'
 // sb-portal-session cookie already authenticates the code-exchange POST.
 const META_APP_ID = process.env.NEXT_PUBLIC_META_APP_ID || ''
 const META_WA_CONFIG_ID = process.env.NEXT_PUBLIC_META_WA_CONFIG_ID || ''
+const META_SOCIAL_CONFIG_ID = process.env.NEXT_PUBLIC_META_SOCIAL_CONFIG_ID || ''
 let fbSdkPromise = null
 function loadFacebookSdk() {
   if (fbSdkPromise) return fbSdkPromise
@@ -167,8 +168,8 @@ function ConnectionRow({ ch, waStatus, waBusy, onConnect, onDisconnect, socialSt
     return (
       <button
         onClick={onConnectSocial}
-        disabled={socialBusy || !META_APP_ID}
-        title={!META_APP_ID ? 'Social connect is not configured yet' : undefined}
+        disabled={socialBusy || !META_APP_ID || !META_SOCIAL_CONFIG_ID}
+        title={!META_APP_ID || !META_SOCIAL_CONFIG_ID ? 'Social connect is not configured yet' : undefined}
         className="w-full mb-4 py-2.5 rounded-xl text-[12.5px] font-semibold transition-opacity disabled:opacity-50 flex items-center justify-center gap-2"
         style={{ background: `${ch.color}18`, color: ch.color, border: `1px solid ${ch.color}30` }}
       >
@@ -747,7 +748,7 @@ export default function ChannelsPage() {
           }
         })()
       }, {
-        scope: 'pages_show_list,pages_messaging,pages_manage_metadata,business_management,instagram_business_basic,instagram_business_manage_messages',
+        config_id: META_SOCIAL_CONFIG_ID,
         response_type: 'code',
         override_default_response_type: true,
       })

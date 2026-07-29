@@ -68,7 +68,12 @@ export async function POST(request) {
       )
     }
 
-    const accounts = await graphGet('/me/accounts', longLivedJson.access_token)
+    // 2. /me/accounts only needs pages_show_list — asking for
+    //    instagram_business_account as a FIELD here (rather than a separate
+    //    GET /{page-id}) avoids needing pages_read_engagement, which we
+    //    deliberately don't request (nothing in the product reads Page
+    //    engagement data).
+    const accounts = await graphGet('/me/accounts?fields=id,name,access_token,instagram_business_account', longLivedJson.access_token)
     const page = accounts?.data?.[0]
     if (!page?.id || !page?.access_token) {
       return NextResponse.json(
@@ -77,11 +82,7 @@ export async function POST(request) {
       )
     }
 
-    // 3. Independently verify what the Page token can actually see, and look
-    //    up its linked Instagram business account if any — never trust
-    //    anything the frontend claims, only what the token itself proves.
-    const pageDetails = await graphGet(`/${page.id}?fields=instagram_business_account`, page.access_token)
-    const igId = pageDetails?.instagram_business_account?.id || null
+    const igId = page?.instagram_business_account?.id || null
     let igUsername = null
     if (igId) {
       try {

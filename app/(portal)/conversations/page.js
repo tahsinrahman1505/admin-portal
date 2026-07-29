@@ -47,6 +47,21 @@ function normalizeIdentity(id) {
   return id ? id.replace(/^\+/, '') : ''
 }
 
+// Replace a matching optimistic message (id starting "opt_") with the real
+// DB row from realtime, instead of appending a second copy — handleSend's
+// optimistic insert and the realtime INSERT event both land for the same
+// send, and without this they render as two identical bubbles.
+function reconcileMessage(list, newRow) {
+  const optIdx = list.findIndex(m =>
+    typeof m.id === 'string' && m.id.startsWith('opt_') &&
+    m.role === newRow.role && m.message === newRow.message
+  )
+  if (optIdx === -1) return [...list, newRow]
+  const next = [...list]
+  next[optIdx] = newRow
+  return next
+}
+
 function formatTimestamp(ts) {
   const date = new Date(ts)
   return date.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' }) +
@@ -363,13 +378,13 @@ export default function ConversationsPage() {
             lastAt:   newRow.created_at,
             status:   newRow.session_status || updated[idx].status,
             channel:  newRow.channel || updated[idx].channel,
-            messages: [...updated[idx].messages, newRow],
+            messages: reconcileMessage(updated[idx].messages, newRow),
           }
           return updated.sort((a, b) => new Date(b.lastAt) - new Date(a.lastAt))
         })
         setSelected(sel => {
           if (sel && sel.session_id === newRow.session_id) {
-            setLiveMessages(prev => [...prev, newRow])
+            setLiveMessages(prev => reconcileMessage(prev, newRow))
           }
           return sel
         })
@@ -482,6 +497,13 @@ export default function ConversationsPage() {
       })
       if (res.ok) {
         setHandoffSessions(prev => prev.filter(h => h.sender_id !== norm))
+        // Optimistic — this used to rely entirely on the realtime UPDATE
+        // subscription to flip the primary status source (thread.status /
+        // message.session_status). When that round-trip lagged, the button
+        // looked like it "didn't work" even though the backend had already
+        // succeeded, so staff would click it repeatedly. Flip it locally too.
+        setThreads(prev => prev.map(t => t.session_id === thread.session_id ? { ...t, status: 'Handled by Bot' } : t))
+        setSelected(sel => sel && sel.session_id === thread.session_id ? { ...sel, status: 'Handled by Bot' } : sel)
       }
     } catch (e) { console.error('Resume error:', e) }
     finally { setResuming(null) }

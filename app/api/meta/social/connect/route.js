@@ -1,12 +1,14 @@
 /**
- * POST /api/meta/social/connect   body: { code: string }
+ * POST /api/meta/social/connect   body: { accessToken: string }
  *
  * Completes Facebook Login for Business for the LOGGED-IN clinic's Messenger +
- * Instagram access. Same popup-based FB.login() pattern as the WhatsApp
- * Embedded Signup connect route (no config_id needed here — this uses a plain
- * `scope` request, not the WhatsApp-specific Embedded Signup product), so the
- * frontend can post the resulting code straight through the existing session
- * cookie — no redirect/nonce dance needed, same as /api/meta/whatsapp/connect.
+ * Instagram access. Uses the JS SDK's default implicit token flow (FB.login()
+ * with a config_id, no response_type: 'code') — the frontend hands over the
+ * short-lived User token from response.authResponse.accessToken directly, no
+ * code-for-token exchange step, so no redirect_uri to keep in sync between
+ * client and server (that's what a code-based version kept failing on).
+ * Same session-cookie auth as /api/meta/whatsapp/connect — no redirect/nonce
+ * dance needed since this never navigates the page away.
  *
  * Multi-tenant safety: client_id is NEVER taken from the request — only from
  * the authenticated session (auth.botClientId), same rule as everywhere else
@@ -42,41 +44,21 @@ export async function POST(request) {
     )
   }
 
-  const { code, redirectUri } = await request.json().catch(() => ({}))
-  if (!code) {
-    return NextResponse.json({ ok: false, error: 'Missing code' }, { status: 400 })
-  }
-  if (!redirectUri) {
-    return NextResponse.json({ ok: false, error: 'Missing redirectUri' }, { status: 400 })
+  const { accessToken: shortLivedToken } = await request.json().catch(() => ({}))
+  if (!shortLivedToken) {
+    return NextResponse.json({ ok: false, error: 'Missing accessToken' }, { status: 400 })
   }
 
   try {
-    // 1. Exchange the short-lived authorization code for a short-lived user
-    //    token. redirect_uri must match EXACTLY what FB.login() was called
-    //    with (Meta validates it), or this fails with "Error validating
-    //    verification code" — the JS SDK popup doesn't supply one implicitly
-    //    for response_type: 'code', so the frontend sets it explicitly and
-    //    passes the same value through here.
-    const tokenRes = await fetch(
-      `https://graph.facebook.com/${GRAPH_VERSION}/oauth/access_token` +
-      `?client_id=${META_APP_ID}&client_secret=${META_APP_SECRET}&code=${encodeURIComponent(code)}` +
-      `&redirect_uri=${encodeURIComponent(redirectUri)}`,
-    )
-    const tokenJson = await tokenRes.json().catch(() => ({}))
-    if (!tokenRes.ok || !tokenJson.access_token) {
-      return NextResponse.json(
-        { ok: false, error: tokenJson?.error?.message || 'Code exchange failed' },
-        { status: 400 },
-      )
-    }
-
-    // 2. Exchange for a long-lived user token, then derive a non-expiring Page
-    //    token from it via /me/accounts — same pattern used to refresh
-    //    dental_demo's Page token manually earlier this session.
+    // 1. Exchange the short-lived User token the JS SDK's implicit flow
+    //    already handed back for a long-lived one, then derive a non-expiring
+    //    Page token from it via /me/accounts — same pattern used to refresh
+    //    dental_demo's Page token manually earlier this session. No
+    //    code-for-token exchange here (no redirect_uri to keep in sync).
     const longLivedRes = await fetch(
       `https://graph.facebook.com/${GRAPH_VERSION}/oauth/access_token` +
       `?grant_type=fb_exchange_token&client_id=${META_APP_ID}&client_secret=${META_APP_SECRET}` +
-      `&fb_exchange_token=${encodeURIComponent(tokenJson.access_token)}`,
+      `&fb_exchange_token=${encodeURIComponent(shortLivedToken)}`,
     )
     const longLivedJson = await longLivedRes.json().catch(() => ({}))
     if (!longLivedRes.ok || !longLivedJson.access_token) {

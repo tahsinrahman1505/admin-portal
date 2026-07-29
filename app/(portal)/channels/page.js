@@ -722,14 +722,16 @@ export default function ChannelsPage() {
       const FB = await loadFacebookSdk()
       if (!FB) throw new Error('Could not load Facebook SDK')
 
-      // The code-for-token exchange requires the EXACT same redirect_uri that
-      // produced the code — the JS SDK popup doesn't surface one implicitly
-      // for response_type: 'code', so it has to be set explicitly here and
-      // sent through to the backend exchange call unchanged.
-      const redirectUri = window.location.origin + window.location.pathname
+      // Use the JS SDK's default implicit token flow (no response_type: 'code')
+      // — response.authResponse.accessToken is a real, usable short-lived User
+      // token straight from the popup. This sidesteps the code-for-token
+      // exchange entirely, so there's no redirect_uri to keep in sync between
+      // client and server (that mismatch is what kept breaking the code-based
+      // version — the JS SDK popup doesn't reliably honor an explicit
+      // redirect_uri for the exchange step).
       FB.login((response) => {
-        const code = response?.authResponse?.code
-        if (!code) {
+        const accessToken = response?.authResponse?.accessToken
+        if (!accessToken) {
           setSocialBusy(false)
           setSocialError('Connection was cancelled or did not complete.')
           return
@@ -739,7 +741,7 @@ export default function ChannelsPage() {
             const res = await fetch('/api/meta/social/connect', {
               method: 'POST',
               headers: { 'content-type': 'application/json' },
-              body: JSON.stringify({ code, redirectUri }),
+              body: JSON.stringify({ accessToken }),
             })
             const data = await res.json()
             if (!res.ok || !data.ok) throw new Error(data.error || 'Connect failed')
@@ -754,9 +756,6 @@ export default function ChannelsPage() {
         })()
       }, {
         config_id: META_SOCIAL_CONFIG_ID,
-        response_type: 'code',
-        override_default_response_type: true,
-        redirect_uri: redirectUri,
       })
     } catch (e) {
       setSocialBusy(false)

@@ -722,6 +722,11 @@ export default function ChannelsPage() {
       const FB = await loadFacebookSdk()
       if (!FB) throw new Error('Could not load Facebook SDK')
 
+      // The code-for-token exchange requires the EXACT same redirect_uri that
+      // produced the code — the JS SDK popup doesn't surface one implicitly
+      // for response_type: 'code', so it has to be set explicitly here and
+      // sent through to the backend exchange call unchanged.
+      const redirectUri = window.location.origin + window.location.pathname
       FB.login((response) => {
         const code = response?.authResponse?.code
         if (!code) {
@@ -734,7 +739,7 @@ export default function ChannelsPage() {
             const res = await fetch('/api/meta/social/connect', {
               method: 'POST',
               headers: { 'content-type': 'application/json' },
-              body: JSON.stringify({ code }),
+              body: JSON.stringify({ code, redirectUri }),
             })
             const data = await res.json()
             if (!res.ok || !data.ok) throw new Error(data.error || 'Connect failed')
@@ -751,6 +756,7 @@ export default function ChannelsPage() {
         config_id: META_SOCIAL_CONFIG_ID,
         response_type: 'code',
         override_default_response_type: true,
+        redirect_uri: redirectUri,
       })
     } catch (e) {
       setSocialBusy(false)

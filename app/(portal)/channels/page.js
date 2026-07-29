@@ -131,12 +131,31 @@ function StatPill({ value, label, color }) {
 
 // ─── Channel card ─────────────────────────────────────────────────────────────
 
-// Connection status/action row — WhatsApp only for now (Instagram/Messenger
-// connect is a planned follow-up using the same pattern with a different
-// Meta config_id + permission set). Deliberately separate from the feature
-// Toggle below: this answers "is it wired to Meta at all", the Toggle answers
-// "should the bot actively use it".
-function ConnectionRow({ ch, waStatus, waBusy, onConnect, onDisconnect }) {
+// Connection status/action row. WhatsApp has a full self-serve Connect/
+// Disconnect flow (Meta Embedded Signup). Messenger/Instagram don't have a
+// self-serve OAuth flow yet — fb_page_id/fb_page_access_token/ig_business_id
+// are still set via the Graph API by an engineer — so those two just show a
+// read-only "Connected to Meta" badge sourced from socialStatus once those
+// fields are populated. Deliberately separate from the feature Toggle below:
+// this answers "is it wired to Meta at all", the Toggle answers "should the
+// bot actively use it".
+function ConnectionRow({ ch, waStatus, waBusy, onConnect, onDisconnect, socialStatus }) {
+  if (ch.key === 'messenger' || ch.key === 'instagram') {
+    const status = socialStatus?.[ch.key]
+    if (!status) {
+      return <div className="h-8 rounded-lg bg-white/[0.03] animate-pulse mb-4" />
+    }
+    if (!status.connected) return null
+    return (
+      <div className="flex items-center gap-1.5 px-3 py-2.5 rounded-xl bg-white/[0.03] border border-white/[0.06] mb-4 text-[11.5px] text-white/50">
+        <svg viewBox="0 0 24 24" fill="none" stroke={ch.color} strokeWidth={2.5} className="w-3.5 h-3.5 shrink-0">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+        </svg>
+        Connected to Meta{ch.key === 'instagram' && status.username ? ` · @${status.username}` : ''}
+      </div>
+    )
+  }
+
   if (ch.key !== 'whatsapp') return null
   if (waStatus === null) {
     return <div className="h-8 rounded-lg bg-white/[0.03] animate-pulse mb-4" />
@@ -173,7 +192,7 @@ function ConnectionRow({ ch, waStatus, waBusy, onConnect, onDisconnect }) {
   )
 }
 
-function ChannelCard({ ch, config, stats, saving, onToggle, onConfigChange, onSave, index, waStatus, waBusy, onConnectWhatsApp, onDisconnectWhatsApp }) {
+function ChannelCard({ ch, config, stats, saving, onToggle, onConfigChange, onSave, index, waStatus, waBusy, onConnectWhatsApp, onDisconnectWhatsApp, socialStatus }) {
   const isEnabled = config?.enabled ?? false
   const [expanded, setExpanded] = useState(false)
 
@@ -231,7 +250,7 @@ function ChannelCard({ ch, config, stats, saving, onToggle, onConfigChange, onSa
           </div>
         </div>
 
-        <ConnectionRow ch={ch} waStatus={waStatus} waBusy={waBusy} onConnect={onConnectWhatsApp} onDisconnect={onDisconnectWhatsApp} />
+        <ConnectionRow ch={ch} waStatus={waStatus} waBusy={waBusy} onConnect={onConnectWhatsApp} onDisconnect={onDisconnectWhatsApp} socialStatus={socialStatus} />
 
         {/* Stats row */}
         <div
@@ -445,6 +464,7 @@ export default function ChannelsPage() {
   const [waStatus, setWaStatus]           = useState(null)   // { connected, wabaId, connectedAt } | null while loading
   const [waBusy, setWaBusy]               = useState(false)
   const [waError, setWaError]             = useState(null)
+  const [socialStatus, setSocialStatus]   = useState(null)   // { messenger: {connected}, instagram: {connected} } | null while loading
   const waMsgListenerRef = useRef(null)
 
   const loadWaStatus = useCallback(async () => {
@@ -454,6 +474,19 @@ export default function ChannelsPage() {
       setWaStatus({ connected: Boolean(data.connected), wabaId: data.wabaId, connectedAt: data.connectedAt })
     } catch {
       setWaStatus({ connected: false, wabaId: null, connectedAt: null })
+    }
+  }, [])
+
+  const loadSocialStatus = useCallback(async () => {
+    try {
+      const res = await fetch('/api/meta/social/status')
+      const data = await res.json()
+      setSocialStatus({
+        messenger: { connected: Boolean(data?.messenger?.connected) },
+        instagram: { connected: Boolean(data?.instagram?.connected), username: data?.instagram?.username || null },
+      })
+    } catch {
+      setSocialStatus({ messenger: { connected: false }, instagram: { connected: false } })
     }
   }, [])
 
@@ -496,6 +529,7 @@ export default function ChannelsPage() {
       // Load per-channel stats in parallel
       await loadStats(cid)
       await loadWaStatus()
+      await loadSocialStatus()
       setLoading(false)
     }
     init()
@@ -741,6 +775,7 @@ export default function ChannelsPage() {
             waBusy={waBusy}
             onConnectWhatsApp={handleConnectWhatsApp}
             onDisconnectWhatsApp={handleDisconnectWhatsApp}
+            socialStatus={socialStatus}
           />
         ))}
       </div>

@@ -230,6 +230,7 @@ export default function ConversationsPage() {
   const [botClientId, setBotClientId]   = useState('')
   const [portalClientId, setPortalClientId] = useState(null)
   const [resuming, setResuming]         = useState(null)
+  const [takingOver, setTakingOver]     = useState(null)
   const [replyText, setReplyText]       = useState('')
   const [sending, setSending]           = useState(false)
   const [attaching, setAttaching]       = useState(false)
@@ -484,6 +485,26 @@ export default function ConversationsPage() {
       }
     } catch (e) { console.error('Resume error:', e) }
     finally { setResuming(null) }
+  }
+
+  // ── Take Over — pause the bot at any time, not just after 24h ──
+  async function handleTakeover(thread) {
+    const norm = normalizeIdentity(thread.sender_id || thread.phone)
+    setTakingOver(norm)
+    try {
+      const res = await fetch(`${API_URL}/session/takeover`, {
+        method: 'POST', headers: API_HEADERS,
+        body: JSON.stringify({ session_id: norm, client_id: botClientId || 'dental_demo' })
+      })
+      if (res.ok) {
+        // Optimistic — the backend also flips conversations.session_status,
+        // which arrives via the realtime UPDATE subscription above, but that
+        // round-trip can lag; set it locally too so the reply box appears now.
+        setThreads(prev => prev.map(t => t.session_id === thread.session_id ? { ...t, status: 'Handed Off' } : t))
+        setSelected(sel => sel && sel.session_id === thread.session_id ? { ...sel, status: 'Handed Off' } : sel)
+      }
+    } catch (e) { console.error('Takeover error:', e) }
+    finally { setTakingOver(null) }
   }
 
   // ── AI Summary ──
@@ -752,7 +773,7 @@ export default function ConversationsPage() {
                     </button>
                   )}
 
-                  {selectedHandedOff && (
+                  {selectedHandedOff ? (
                     <button
                       onClick={() => handleResume(selected)}
                       disabled={resuming === normalizeIdentity(selected.sender_id || selected.phone)}
@@ -764,6 +785,20 @@ export default function ConversationsPage() {
                       {resuming === normalizeIdentity(selected.sender_id || selected.phone) ? (
                         <><span className="w-3 h-3 border border-[#00e5b0]/60 border-t-[#00e5b0] rounded-full animate-spin" />Resuming…</>
                       ) : <>🤖 Resume Bot</>}
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => handleTakeover(selected)}
+                      disabled={takingOver === normalizeIdentity(selected.sender_id || selected.phone)}
+                      title="Pause the bot and reply yourself, at any point in the conversation"
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11.5px] font-medium
+                                 bg-indigo-500/10 text-indigo-300 border border-indigo-500/25
+                                 hover:bg-indigo-500/20 transition-colors
+                                 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {takingOver === normalizeIdentity(selected.sender_id || selected.phone) ? (
+                        <><span className="w-3 h-3 border border-indigo-300/60 border-t-indigo-300 rounded-full animate-spin" />Taking over…</>
+                      ) : <>🙋 Take Over</>}
                     </button>
                   )}
                 </div>

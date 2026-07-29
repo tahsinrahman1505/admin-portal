@@ -42,16 +42,25 @@ export async function POST(request) {
     )
   }
 
-  const { code } = await request.json().catch(() => ({}))
+  const { code, redirectUri } = await request.json().catch(() => ({}))
   if (!code) {
     return NextResponse.json({ ok: false, error: 'Missing code' }, { status: 400 })
   }
+  if (!redirectUri) {
+    return NextResponse.json({ ok: false, error: 'Missing redirectUri' }, { status: 400 })
+  }
 
   try {
-    // 1. Exchange the short-lived authorization code for a short-lived user token.
+    // 1. Exchange the short-lived authorization code for a short-lived user
+    //    token. redirect_uri must match EXACTLY what FB.login() was called
+    //    with (Meta validates it), or this fails with "Error validating
+    //    verification code" — the JS SDK popup doesn't supply one implicitly
+    //    for response_type: 'code', so the frontend sets it explicitly and
+    //    passes the same value through here.
     const tokenRes = await fetch(
       `https://graph.facebook.com/${GRAPH_VERSION}/oauth/access_token` +
-      `?client_id=${META_APP_ID}&client_secret=${META_APP_SECRET}&code=${encodeURIComponent(code)}`,
+      `?client_id=${META_APP_ID}&client_secret=${META_APP_SECRET}&code=${encodeURIComponent(code)}` +
+      `&redirect_uri=${encodeURIComponent(redirectUri)}`,
     )
     const tokenJson = await tokenRes.json().catch(() => ({}))
     if (!tokenRes.ok || !tokenJson.access_token) {

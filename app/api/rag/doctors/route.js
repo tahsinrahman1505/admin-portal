@@ -5,7 +5,7 @@
  * Keeps RAG_API_SECRET out of the browser bundle.
  */
 import { NextResponse } from 'next/server'
-import { getAuthedUser, unauthorized, enforceTenant } from '@/lib/auth'
+import { getAuthedUser, unauthorized, enforceTenant, forbidden } from '@/lib/auth'
 import { demoGuard } from '@/lib/demoRoute'
 
 const RAG_URL    = process.env.NEXT_PUBLIC_API_URL || 'https://n8n.mdtahsinrahman.com/api'
@@ -38,10 +38,12 @@ export async function POST(request) {
   const auth = await getAuthedUser(request)
   if (!auth) return unauthorized()
   try {
+    // Default-deny: a caller with no clinic mapping (self-registered account) must
+    // not create doctors. Then force the doctor onto the logged-in user's clinic so
+    // a stale/forged client_id in the body can't create one under another tenant.
+    if (!auth.botClientId) return forbidden('No clinic associated with this account')
     const body = await request.json()
-    // Server-authoritative: force the doctor onto the logged-in user's clinic so a
-    // stale/forged client_id in the body can't create a doctor under another tenant.
-    if (auth.botClientId) body.client_id = auth.botClientId
+    body.client_id = auth.botClientId
     const res = await fetch(`${RAG_URL}/doctors`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-api-key': API_SECRET },

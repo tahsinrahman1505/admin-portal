@@ -1,6 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
-import { getAuthedUser, unauthorized } from '@/lib/auth'
+import { getAuthedUser, unauthorized, forbidden } from '@/lib/auth'
 
 // Server-only client (service-role key, kept server-side). Created lazily via this
 // getter — NOT at module scope — so a build with no Supabase env (e.g. the demo
@@ -16,12 +16,17 @@ export async function POST(req) {
   const auth = await getAuthedUser(req)
   if (!auth) return unauthorized()
   try {
+    // Default-deny + server-authoritative client_id: bind the push endpoint to the
+    // logged-in user's OWN clinic. Never trust a caller-supplied client_id — a
+    // self-registered account could otherwise register its device under another
+    // clinic and receive that clinic's push notifications (interception/phishing).
+    if (!auth.botClientId) return forbidden('No clinic associated with this account')
     const supabase = getSupabase()
-    const { subscription, client_id } = await req.json()
-    if (!subscription || !client_id) {
+    const { subscription } = await req.json()
+    if (!subscription?.endpoint) {
       return NextResponse.json({ error: 'Missing fields' }, { status: 400 })
     }
-
+    const client_id = auth.botClientId
     const endpoint = subscription.endpoint
 
     await supabase

@@ -27,12 +27,31 @@ function ChannelBadge({ channel }) {
 
 // ── Identity helpers ─────────────────────────────────────────────────────────
 
-function maskIdentity(id, channel) {
+// username/displayName come from the bot's Graph API resolution (rag_server.py
+// resolve_channel_identity), cached on the thread's most recent conversation row.
+// Falls back to the masked internal ID when a sender hasn't been resolved yet
+// (brand-new conversation) or resolution failed (no page token / API error).
+function maskIdentity(id, channel, username, displayName) {
+  if (channel === 'instagram' && username) return `@${username}`
+  if (channel === 'messenger' && displayName) return displayName
   if (!id) return 'Unknown'
   if (channel === 'instagram') return `@ig_${id.slice(-6)}`
   if (channel === 'messenger') return `msg_${id.slice(-6)}`
   // WhatsApp: mask phone
   return id.slice(0, -6) + '***-**' + id.slice(-2)
+}
+
+// The bot resolves + backfills sender_username/sender_display_name onto every row
+// for a session once known, but resolution can still be mid-flight — scan from the
+// most recent message backwards so a not-yet-backfilled older row can't shadow it.
+function pickIdentity(messages) {
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const m = messages[i]
+    if (m.sender_username || m.sender_display_name) {
+      return { username: m.sender_username || null, displayName: m.sender_display_name || null }
+    }
+  }
+  return { username: null, displayName: null }
 }
 
 function displayIdentity(id, channel) {
@@ -325,6 +344,7 @@ export default function ConversationsPage() {
         status:       messages[messages.length - 1]?.session_status || messages[0]?.session_status || 'Handled by Bot',
         firstMessage: messages.find(m => m.role === 'customer')?.message || messages[0]?.message,
         lastAt:       messages[messages.length - 1]?.created_at,
+        ...pickIdentity(messages),
         messages,
       })).sort((a, b) => new Date(b.lastAt) - new Date(a.lastAt))
 
@@ -368,17 +388,20 @@ export default function ConversationsPage() {
               status:       newRow.session_status || 'Handed Off',
               firstMessage: newRow.role === 'customer' ? newRow.message : '',
               lastAt:       newRow.created_at,
+              ...pickIdentity([newRow]),
               messages:     [newRow],
             }
             return [newThread, ...prev]
           }
           const updated = [...prev]
+          const mergedMessages = reconcileMessage(updated[idx].messages, newRow)
           updated[idx] = {
             ...updated[idx],
             lastAt:   newRow.created_at,
             status:   newRow.session_status || updated[idx].status,
             channel:  newRow.channel || updated[idx].channel,
-            messages: reconcileMessage(updated[idx].messages, newRow),
+            ...pickIdentity(mergedMessages),
+            messages: mergedMessages,
           }
           return updated.sort((a, b) => new Date(b.lastAt) - new Date(a.lastAt))
         })
@@ -396,13 +419,23 @@ export default function ConversationsPage() {
         const updated = payload.new
         setThreads(prev => prev.map(t => {
           if (t.session_id !== updated.session_id) return t
+          // Covers both delivery-status patches AND the identity backfill: a
+          // brand-new sender's username/display name resolves in the background
+          // after the first message inserts, then lands here as an UPDATE.
+          const mergedMessages = t.messages.map(m => m.id === updated.id ? updated : m)
           return {
             ...t,
             status: updated.session_status || t.status,
-            messages: t.messages.map(m => m.id === updated.id ? updated : m),
+            ...pickIdentity(mergedMessages),
+            messages: mergedMessages,
           }
         }))
         setLiveMessages(prev => prev.map(m => m.id === updated.id ? updated : m))
+        setSelected(sel => {
+          if (!sel || sel.session_id !== updated.session_id) return sel
+          const mergedMessages = sel.messages.map(m => m.id === updated.id ? updated : m)
+          return { ...sel, ...pickIdentity(mergedMessages), messages: mergedMessages }
+        })
       })
       .subscribe()
 
@@ -744,7 +777,7 @@ export default function ConversationsPage() {
               >
                 <div className="flex items-start justify-between gap-2 mb-1">
                   <span className="text-[12.5px] font-medium text-white leading-tight truncate">
-                    {maskIdentity(thread.sender_id || thread.phone, threadCh)}
+                    {maskIdentity(thread.sender_id || thread.phone, threadCh, thread.username, thread.displayName)}
                   </span>
                   <ChannelBadge channel={threadCh} />
                 </div>
@@ -773,7 +806,7 @@ export default function ConversationsPage() {
                 <div>
                   <div className="flex items-center gap-2 mb-0.5">
                     <p className="text-[13.5px] font-semibold text-white">
-                      {maskIdentity(selected.sender_id || selected.phone, selectedChannel)}
+                      {maskIdentity(selected.sender_id || selected.phone, selectedChannel, selected.username, selected.displayName)}
                     </p>
                     <ChannelBadge channel={selectedChannel} />
                   </div>

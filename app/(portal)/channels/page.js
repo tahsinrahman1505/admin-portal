@@ -514,6 +514,28 @@ export default function ChannelsPage() {
     }
   }, [])
 
+  const loadStats = useCallback(async (cid) => {
+    const stats = { whatsapp: {}, instagram: {}, messenger: {} }
+    await Promise.all(
+      CHANNELS.map(async ch => {
+        try {
+          const [{ count: messages }, { count: leads }, { count: bookings }] = await Promise.all([
+            supabase.from('conversations').select('*', { count: 'exact', head: true })
+              .eq('client_id', cid).eq('channel', ch.key),
+            supabase.from('leads').select('*', { count: 'exact', head: true })
+              .eq('client_id', cid).eq('channel', ch.key),
+            supabase.from('leads').select('*', { count: 'exact', head: true })
+              .eq('client_id', cid).eq('channel', ch.key).eq('status', 'booked'),
+          ])
+          stats[ch.key] = { messages: messages ?? 0, leads: leads ?? 0, bookings: bookings ?? 0 }
+        } catch {
+          stats[ch.key] = { messages: 0, leads: 0, bookings: 0 }
+        }
+      })
+    )
+    setAllStats(stats)
+  }, [])
+
   // ── Auth + load ────────────────────────────────────────────────────────────
   useEffect(() => {
     async function init() {
@@ -560,29 +582,7 @@ export default function ChannelsPage() {
     return () => {
       if (waMsgListenerRef.current) window.removeEventListener('message', waMsgListenerRef.current)
     }
-  }, [])
-
-  const loadStats = useCallback(async (cid) => {
-    const stats = { whatsapp: {}, instagram: {}, messenger: {} }
-    await Promise.all(
-      CHANNELS.map(async ch => {
-        try {
-          const [{ count: messages }, { count: leads }, { count: bookings }] = await Promise.all([
-            supabase.from('conversations').select('*', { count: 'exact', head: true })
-              .eq('client_id', cid).eq('channel', ch.key),
-            supabase.from('leads').select('*', { count: 'exact', head: true })
-              .eq('client_id', cid).eq('channel', ch.key),
-            supabase.from('leads').select('*', { count: 'exact', head: true })
-              .eq('client_id', cid).eq('channel', ch.key).eq('status', 'booked'),
-          ])
-          stats[ch.key] = { messages: messages ?? 0, leads: leads ?? 0, bookings: bookings ?? 0 }
-        } catch {
-          stats[ch.key] = { messages: 0, leads: 0, bookings: 0 }
-        }
-      })
-    )
-    setAllStats(stats)
-  }, [])
+  }, [loadSocialStatus, loadStats, loadWaStatus, router])
 
   // ── Toggle ─────────────────────────────────────────────────────────────────
   function handleToggle(chKey, val) {

@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
+import { NAV_ITEMS_READY } from '@/lib/nav'
 
 /**
  * ⌘K command palette — the portal's signature navigation surface.
@@ -11,19 +12,23 @@ import { motion, AnimatePresence } from 'framer-motion'
  * full keyboard control (↑ ↓ ↵ Esc). Frosted glass over a dimmed aurora, spring
  * entrance. Mounted once in the portal layout so it's reachable from every page.
  */
-const COMMANDS = [
-  { group: 'Go to', label: 'Dashboard',       href: '/dashboard',      kws: 'home overview' },
-  { group: 'Go to', label: 'Conversations',   href: '/conversations',  kws: 'chats messages inbox' },
-  { group: 'Go to', label: 'Leads',           href: '/leads',          kws: 'pipeline crm prospects' },
-  { group: 'Go to', label: 'Bookings',        href: '/bookings',       kws: 'appointments calendar' },
-  { group: 'Go to', label: 'Patients',        href: '/patients',       kws: 'people roster' },
-  { group: 'Go to', label: 'Analytics',       href: '/analytics',      kws: 'stats charts reports' },
-  { group: 'Go to', label: 'Activity',        href: '/activity',       kws: 'log timeline events' },
-  { group: 'Go to', label: 'Knowledge Base',  href: '/knowledge-base', kws: 'kb faq bot training' },
-  { group: 'Go to', label: 'Channels',        href: '/channels',       kws: 'whatsapp instagram messenger' },
-  { group: 'Go to', label: 'Team',            href: '/team',           kws: 'doctors staff' },
-  { group: 'Go to', label: 'Settings',        href: '/settings',       kws: 'config preferences greeting' },
-]
+/**
+ * Destinations come from lib/nav.js — the same list the sidebar renders.
+ *
+ * This used to be a hand-maintained copy of the sidebar's nav, and it had already
+ * drifted: Copilot and Recall were both missing, so two shipped pages were
+ * unreachable from ⌘K. Deriving it means a new destination can never again exist
+ * in one surface and not the other.
+ *
+ * Not-yet-built destinations are excluded (NAV_ITEMS_READY) — offering to
+ * navigate somewhere that isn't built yet is worse than not offering it.
+ */
+const COMMANDS = NAV_ITEMS_READY.map(item => ({
+  group: 'Go to',
+  label: item.label,
+  href: item.href,
+  kws: item.kws || '',
+}))
 
 const ICON = (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.7} className="w-4 h-4 shrink-0">
@@ -38,11 +43,20 @@ export default function CommandPalette() {
   const [active, setActive] = useState(0)
   const inputRef = useRef(null)
 
-  // Global hotkeys: ⌘K / Ctrl+K to open, Esc to close.
+  // Global hotkeys: ⌘K / Ctrl+K to open, Esc to close. The query/active reset
+  // happens right here, at the moment we flip `open` true (a native keydown
+  // callback, not a React effect body — calling setState here isn't the
+  // "synchronous setState in an effect" cascading-render case at all), so the
+  // open-keyed effect below is left with only the genuine side effect: DOM
+  // focus, which can't happen until the palette has actually mounted.
   useEffect(() => {
     const onKey = (e) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
-        e.preventDefault(); setOpen(o => !o)
+        e.preventDefault()
+        setOpen(o => {
+          if (!o) { setQ(''); setActive(0) }
+          return !o
+        })
       } else if (e.key === 'Escape') {
         setOpen(false)
       }
@@ -52,7 +66,7 @@ export default function CommandPalette() {
   }, [])
 
   useEffect(() => {
-    if (open) { setQ(''); setActive(0); setTimeout(() => inputRef.current?.focus(), 30) }
+    if (open) setTimeout(() => inputRef.current?.focus(), 30)
   }, [open])
 
   const results = useMemo(() => {
@@ -61,7 +75,16 @@ export default function CommandPalette() {
     return COMMANDS.filter(c => (c.label + ' ' + c.kws).toLowerCase().includes(s))
   }, [q])
 
-  useEffect(() => { setActive(0) }, [q])
+  // Reset the highlighted result whenever the query changes — computed during
+  // render (the "adjusting state when a prop changes" pattern from the React
+  // docs: https://react.dev/reference/react/useState#storing-information-from-previous-renders)
+  // instead of a useEffect, so there's no extra render pass or setState call
+  // from inside an effect body.
+  const [prevQ, setPrevQ] = useState(q)
+  if (q !== prevQ) {
+    setPrevQ(q)
+    setActive(0)
+  }
 
   const run = (cmd) => { if (!cmd) return; setOpen(false); router.push(cmd.href) }
 

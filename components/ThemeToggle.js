@@ -13,6 +13,7 @@ export default function ThemeToggle() {
   const [theme, setTheme] = useState(null)
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time read of the DOM-stamped theme on mount, not a render-cascade risk; can't live in the useState initializer (SSR has no `document`, and theme-init.js only stamps the attribute pre-paint on the client)
     setTheme(document.documentElement.getAttribute('data-theme') === 'light' ? 'light' : 'dark')
   }, [])
 

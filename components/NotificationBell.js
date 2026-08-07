@@ -45,7 +45,9 @@ export default function NotificationBell({ clientId }) {
     if (data) setNotifications(data)
   }, [clientId])
 
-  useEffect(() => { loadNotifications() }, [loadNotifications])
+  // Wrapped in an inline IIFE, same pattern as the channels page's `init()` —
+  // keeps the effect body itself from calling setState synchronously.
+  useEffect(() => { (async () => { await loadNotifications() })() }, [loadNotifications])
 
   // ── Realtime: new notifications ─────────────────────────────────────────────
   useEffect(() => {
@@ -84,6 +86,7 @@ export default function NotificationBell({ clientId }) {
   // ── Check push status ───────────────────────────────────────────────────────
   useEffect(() => {
     if ('Notification' in window) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time read of the browser's Notification permission on mount, not a render-cascade risk; `Notification`/`window` don't exist during SSR so this can't live in the useState initializer
       setPushEnabled(Notification.permission === 'granted')
     }
   }, [])

@@ -1,7 +1,14 @@
 /**
  * Server-side proxy for:
- *   GET  /ingest/list  — list knowledge base documents
- *   POST /ingest       — upload a new document
+ *   GET  /api/rag/ingest  — list knowledge base documents
+ *   POST /api/rag/ingest  — upload a new document
+ *
+ * Note the browser-facing paths above are BOTH `/api/rag/ingest`. This docstring
+ * used to claim the GET was at `/ingest/list`, which is the UPSTREAM RAG path
+ * this route proxies to (see the fetch below) — not the path this handler serves.
+ * The knowledge-base page believed the docstring, called `/api/rag/ingest/list`,
+ * and silently got a 405 from the `[id]` route for two releases.
+ *
  * Keeps RAG_API_SECRET out of the browser bundle.
  */
 import { NextResponse } from 'next/server'

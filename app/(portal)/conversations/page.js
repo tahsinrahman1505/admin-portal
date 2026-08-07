@@ -27,12 +27,31 @@ function ChannelBadge({ channel }) {
 
 // ── Identity helpers ─────────────────────────────────────────────────────────
 
-function maskIdentity(id, channel) {
+// username/displayName come from the bot's Graph API resolution (rag_server.py
+// resolve_channel_identity), cached on the thread's most recent conversation row.
+// Falls back to the masked internal ID when a sender hasn't been resolved yet
+// (brand-new conversation) or resolution failed (no page token / API error).
+function maskIdentity(id, channel, username, displayName) {
+  if (channel === 'instagram' && username) return `@${username}`
+  if (channel === 'messenger' && displayName) return displayName
   if (!id) return 'Unknown'
   if (channel === 'instagram') return `@ig_${id.slice(-6)}`
   if (channel === 'messenger') return `msg_${id.slice(-6)}`
   // WhatsApp: mask phone
   return id.slice(0, -6) + '***-**' + id.slice(-2)
+}
+
+// The bot resolves + backfills sender_username/sender_display_name onto every row
+// for a session once known, but resolution can still be mid-flight — scan from the
+// most recent message backwards so a not-yet-backfilled older row can't shadow it.
+function pickIdentity(messages) {
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const m = messages[i]
+    if (m.sender_username || m.sender_display_name) {
+      return { username: m.sender_username || null, displayName: m.sender_display_name || null }
+    }
+  }
+  return { username: null, displayName: null }
 }
 
 function displayIdentity(id, channel) {
@@ -45,6 +64,21 @@ function displayIdentity(id, channel) {
 function normalizeIdentity(id) {
   // For WhatsApp: strip leading +; for IG/Messenger: keep as-is
   return id ? id.replace(/^\+/, '') : ''
+}
+
+// Replace a matching optimistic message (id starting "opt_") with the real
+// DB row from realtime, instead of appending a second copy — handleSend's
+// optimistic insert and the realtime INSERT event both land for the same
+// send, and without this they render as two identical bubbles.
+function reconcileMessage(list, newRow) {
+  const optIdx = list.findIndex(m =>
+    typeof m.id === 'string' && m.id.startsWith('opt_') &&
+    m.role === newRow.role && m.message === newRow.message
+  )
+  if (optIdx === -1) return [...list, newRow]
+  const next = [...list]
+  next[optIdx] = newRow
+  return next
 }
 
 function formatTimestamp(ts) {
@@ -230,11 +264,13 @@ export default function ConversationsPage() {
   const [botClientId, setBotClientId]   = useState('')
   const [portalClientId, setPortalClientId] = useState(null)
   const [resuming, setResuming]         = useState(null)
+  const [takingOver, setTakingOver]     = useState(null)
   const [replyText, setReplyText]       = useState('')
   const [sending, setSending]           = useState(false)
   const [attaching, setAttaching]       = useState(false)
   const [summary, setSummary]           = useState(null)
   const [summarizing, setSummarizing]   = useState(false)
+  const [suggesting, setSuggesting]     = useState(false)
 
   const [liveMessages, setLiveMessages] = useState([])
   const [deliveries, setDeliveries]     = useState([]) // message_delivery rows for selected thread
@@ -308,6 +344,7 @@ export default function ConversationsPage() {
         status:       messages[messages.length - 1]?.session_status || messages[0]?.session_status || 'Handled by Bot',
         firstMessage: messages.find(m => m.role === 'customer')?.message || messages[0]?.message,
         lastAt:       messages[messages.length - 1]?.created_at,
+        ...pickIdentity(messages),
         messages,
       })).sort((a, b) => new Date(b.lastAt) - new Date(a.lastAt))
 
@@ -351,23 +388,26 @@ export default function ConversationsPage() {
               status:       newRow.session_status || 'Handed Off',
               firstMessage: newRow.role === 'customer' ? newRow.message : '',
               lastAt:       newRow.created_at,
+              ...pickIdentity([newRow]),
               messages:     [newRow],
             }
             return [newThread, ...prev]
           }
           const updated = [...prev]
+          const mergedMessages = reconcileMessage(updated[idx].messages, newRow)
           updated[idx] = {
             ...updated[idx],
             lastAt:   newRow.created_at,
             status:   newRow.session_status || updated[idx].status,
             channel:  newRow.channel || updated[idx].channel,
-            messages: [...updated[idx].messages, newRow],
+            ...pickIdentity(mergedMessages),
+            messages: mergedMessages,
           }
           return updated.sort((a, b) => new Date(b.lastAt) - new Date(a.lastAt))
         })
         setSelected(sel => {
           if (sel && sel.session_id === newRow.session_id) {
-            setLiveMessages(prev => [...prev, newRow])
+            setLiveMessages(prev => reconcileMessage(prev, newRow))
           }
           return sel
         })
@@ -379,13 +419,23 @@ export default function ConversationsPage() {
         const updated = payload.new
         setThreads(prev => prev.map(t => {
           if (t.session_id !== updated.session_id) return t
+          // Covers both delivery-status patches AND the identity backfill: a
+          // brand-new sender's username/display name resolves in the background
+          // after the first message inserts, then lands here as an UPDATE.
+          const mergedMessages = t.messages.map(m => m.id === updated.id ? updated : m)
           return {
             ...t,
             status: updated.session_status || t.status,
-            messages: t.messages.map(m => m.id === updated.id ? updated : m),
+            ...pickIdentity(mergedMessages),
+            messages: mergedMessages,
           }
         }))
         setLiveMessages(prev => prev.map(m => m.id === updated.id ? updated : m))
+        setSelected(sel => {
+          if (!sel || sel.session_id !== updated.session_id) return sel
+          const mergedMessages = sel.messages.map(m => m.id === updated.id ? updated : m)
+          return { ...sel, ...pickIdentity(mergedMessages), messages: mergedMessages }
+        })
       })
       .subscribe()
 
@@ -447,13 +497,17 @@ export default function ConversationsPage() {
 
   // ── Handoff check — now channel-aware ──
   function isHandedOff(thread) {
-    // Primary: check messages directly — conversations table is readable by anon,
-    // sessions table is RLS-blocked so handoffSessions is often empty.
-    const msgs = thread.messages || []
-    if (msgs.some(m => m.session_status === 'Handed Off')) return true
-    // Also check thread-level status (set from last message)
+    // Primary: the MOST RECENT message's status — a conversation that was
+    // ever handed off in the past (any earlier message) must not stay stuck
+    // reading as handed off forever after a resume; only the latest state
+    // matters. thread.status already tracks this (set from the last message
+    // on load, and kept current by the realtime INSERT/UPDATE handlers and
+    // the optimistic flips in handleResume/handleTakeover).
     if (thread.status === 'Handed Off') return true
-    // Fallback: sessions table check (works if RLS allows)
+    if (thread.status) return false
+    // Fallback for a thread with no status yet: sessions table check
+    // (conversations table is readable by anon; sessions is RLS-blocked so
+    // this is often empty, but still worth trying).
     const norm = normalizeIdentity(thread.sender_id || thread.phone)
     return handoffSessions.some(h => h.sender_id === norm)
   }
@@ -480,9 +534,36 @@ export default function ConversationsPage() {
       })
       if (res.ok) {
         setHandoffSessions(prev => prev.filter(h => h.sender_id !== norm))
+        // Optimistic — this used to rely entirely on the realtime UPDATE
+        // subscription to flip the primary status source (thread.status /
+        // message.session_status). When that round-trip lagged, the button
+        // looked like it "didn't work" even though the backend had already
+        // succeeded, so staff would click it repeatedly. Flip it locally too.
+        setThreads(prev => prev.map(t => t.session_id === thread.session_id ? { ...t, status: 'Handled by Bot' } : t))
+        setSelected(sel => sel && sel.session_id === thread.session_id ? { ...sel, status: 'Handled by Bot' } : sel)
       }
     } catch (e) { console.error('Resume error:', e) }
     finally { setResuming(null) }
+  }
+
+  // ── Take Over — pause the bot at any time, not just after 24h ──
+  async function handleTakeover(thread) {
+    const norm = normalizeIdentity(thread.sender_id || thread.phone)
+    setTakingOver(norm)
+    try {
+      const res = await fetch(`${API_URL}/session/takeover`, {
+        method: 'POST', headers: API_HEADERS,
+        body: JSON.stringify({ session_id: norm, client_id: botClientId || 'dental_demo' })
+      })
+      if (res.ok) {
+        // Optimistic — the backend also flips conversations.session_status,
+        // which arrives via the realtime UPDATE subscription above, but that
+        // round-trip can lag; set it locally too so the reply box appears now.
+        setThreads(prev => prev.map(t => t.session_id === thread.session_id ? { ...t, status: 'Handed Off' } : t))
+        setSelected(sel => sel && sel.session_id === thread.session_id ? { ...sel, status: 'Handed Off' } : sel)
+      }
+    } catch (e) { console.error('Takeover error:', e) }
+    finally { setTakingOver(null) }
   }
 
   // ── AI Summary ──
@@ -498,6 +579,21 @@ export default function ConversationsPage() {
       setSummary(data.summary || 'No summary available.')
     } catch { setSummary('Failed to generate summary. Please try again.') }
     finally { setSummarizing(false) }
+  }
+
+  // ── AI Suggested reply (draft into the reply box; staff edits before sending) ──
+  async function handleSuggest() {
+    if (!selected || suggesting) return
+    setSuggesting(true)
+    try {
+      const res = await fetch(`${API_URL}/session/suggest`, {
+        method: 'POST', headers: API_HEADERS,
+        body: JSON.stringify({ session_id: selected.session_id, client_id: botClientId || 'dental_demo' })
+      })
+      const data = await res.json()
+      if (data.suggestion) setReplyText(data.suggestion)
+    } catch (e) { console.error('Suggest error:', e) }
+    finally { setSuggesting(false) }
   }
 
   // ── Owner reply — channel-aware ──
@@ -681,7 +777,7 @@ export default function ConversationsPage() {
               >
                 <div className="flex items-start justify-between gap-2 mb-1">
                   <span className="text-[12.5px] font-medium text-white leading-tight truncate">
-                    {maskIdentity(thread.sender_id || thread.phone, threadCh)}
+                    {maskIdentity(thread.sender_id || thread.phone, threadCh, thread.username, thread.displayName)}
                   </span>
                   <ChannelBadge channel={threadCh} />
                 </div>
@@ -697,7 +793,7 @@ export default function ConversationsPage() {
       </div>
 
       {/* ── Chat panel ── */}
-      <div className="flex-1 flex flex-col overflow-hidden bg-[#080808]">
+      <div className="flex-1 flex flex-col overflow-hidden glass-strong sheen">
         {!selected ? (
           <div className="flex items-center justify-center h-full text-white/20 text-sm">
             Select a conversation to view
@@ -710,7 +806,7 @@ export default function ConversationsPage() {
                 <div>
                   <div className="flex items-center gap-2 mb-0.5">
                     <p className="text-[13.5px] font-semibold text-white">
-                      {maskIdentity(selected.sender_id || selected.phone, selectedChannel)}
+                      {maskIdentity(selected.sender_id || selected.phone, selectedChannel, selected.username, selected.displayName)}
                     </p>
                     <ChannelBadge channel={selectedChannel} />
                   </div>
@@ -736,7 +832,7 @@ export default function ConversationsPage() {
                     </button>
                   )}
 
-                  {selectedHandedOff && (
+                  {selectedHandedOff ? (
                     <button
                       onClick={() => handleResume(selected)}
                       disabled={resuming === normalizeIdentity(selected.sender_id || selected.phone)}
@@ -749,12 +845,26 @@ export default function ConversationsPage() {
                         <><span className="w-3 h-3 border border-[#00e5b0]/60 border-t-[#00e5b0] rounded-full animate-spin" />Resuming…</>
                       ) : <>🤖 Resume Bot</>}
                     </button>
+                  ) : (
+                    <button
+                      onClick={() => handleTakeover(selected)}
+                      disabled={takingOver === normalizeIdentity(selected.sender_id || selected.phone)}
+                      title="Pause the bot and reply yourself, at any point in the conversation"
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11.5px] font-medium
+                                 bg-indigo-500/10 text-indigo-300 border border-indigo-500/25
+                                 hover:bg-indigo-500/20 transition-colors
+                                 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {takingOver === normalizeIdentity(selected.sender_id || selected.phone) ? (
+                        <><span className="w-3 h-3 border border-indigo-300/60 border-t-indigo-300 rounded-full animate-spin" />Taking over…</>
+                      ) : <>🙋 Take Over</>}
+                    </button>
                   )}
                 </div>
               </div>
 
               {summary && (
-                <div className="mx-6 mb-4 bg-white/[0.03] border border-white/[0.07] rounded-xl px-4 py-3 flex gap-3">
+                <div className="mx-6 mb-4 glass sheen rounded-xl relative px-4 py-3 flex gap-3">
                   <span className="text-[#00e5b0] text-[14px] shrink-0 mt-0.5">✦</span>
                   <div className="flex-1 min-w-0">
                     <p className="text-[11px] text-[#00e5b0] font-semibold uppercase tracking-wider mb-1.5">AI Summary</p>
@@ -846,6 +956,23 @@ export default function ConversationsPage() {
             {/* Reply box — only during handoff */}
             {selectedHandedOff && (
               <div className="shrink-0 border-t border-white/[0.06] bg-white/[0.02] px-4 py-3">
+                <div className="flex items-center justify-between mb-2">
+                  <button
+                    onClick={handleSuggest}
+                    disabled={suggesting || sending}
+                    title="Draft a reply with AI — review and edit before sending"
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11.5px] font-medium
+                               bg-indigo-500/10 text-indigo-300 border border-indigo-500/20
+                               hover:bg-indigo-500/20 transition-colors
+                               disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    {suggesting ? (
+                      <span className="w-3 h-3 border border-indigo-300/40 border-t-indigo-300 rounded-full animate-spin inline-block" />
+                    ) : <span>✨</span>}
+                    {suggesting ? 'Drafting…' : 'Suggest reply'}
+                  </button>
+                  <span className="text-[10.5px] text-white/20">AI draft · you edit before sending</span>
+                </div>
                 <div className="flex items-end gap-2">
                   <input
                     ref={fileInputRef}

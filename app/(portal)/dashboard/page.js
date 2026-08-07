@@ -37,7 +37,7 @@ function RevenuePipeline({ conversations, leadsTotal, hotWarmLeads, confirmedBoo
       initial={{ opacity: 0, y: 20 }}
       animate={inView ? { opacity: 1, y: 0 } : {}}
       transition={{ duration: 0.5, delay: 0.36, ease: [0.16, 1, 0.3, 1] }}
-      className="bg-white/[0.03] border border-white/[0.07] rounded-2xl p-6 mb-5 relative overflow-hidden"
+      className="glass sheen lift rounded-[var(--r-md)] relative p-6 mb-5 relative overflow-hidden"
     >
       <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-[#00e5b0]/30 to-transparent" />
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
@@ -61,12 +61,12 @@ function RevenuePipeline({ conversations, leadsTotal, hotWarmLeads, confirmedBoo
           <p className="text-[#00e5b0] font-extrabold text-[1.35rem] leading-none tabular-nums">AED {revenue.toLocaleString()}</p>
           <p className="text-[#00e5b0]/40 text-[10.5px] mt-1">{confirmedBookings} bookings confirmed</p>
         </div>
-        <div className="bg-white/[0.025] border border-white/[0.06] rounded-xl p-4">
+        <div className="rounded-xl relative bg-white/[0.03] border border-white/[0.07] backdrop-blur-xl p-4">
           <p className="text-white/35 text-[11px] mb-1">Pipeline (projected)</p>
           <p className="text-white/70 font-extrabold text-[1.35rem] leading-none tabular-nums">AED {pipeline.toLocaleString()}</p>
           <p className="text-white/25 text-[10.5px] mt-1">{hotWarmLeads} active leads</p>
         </div>
-        <div className="bg-white/[0.025] border border-white/[0.06] rounded-xl p-4 col-span-2 sm:col-span-1">
+        <div className="rounded-xl relative bg-white/[0.03] border border-white/[0.07] backdrop-blur-xl p-4 col-span-2 sm:col-span-1">
           <p className="text-white/35 text-[11px] mb-1">Total Potential</p>
           <p className="text-white/50 font-extrabold text-[1.35rem] leading-none tabular-nums">AED {(revenue + pipeline).toLocaleString()}</p>
           <p className="text-white/25 text-[10.5px] mt-1">{leadsTotal > 0 ? Math.round((confirmedBookings / leadsTotal) * 100) : 0}% lead → booking</p>
@@ -225,7 +225,7 @@ function MetricCard({ card, index, inView }) {
       initial={{ opacity: 0, y: 24 }}
       animate={inView ? { opacity: 1, y: 0 } : {}}
       transition={{ duration: 0.5, delay: 0.05 + index * 0.08, ease: [0.16, 1, 0.3, 1] }}
-      className="bg-white/[0.03] border border-white/[0.07] rounded-2xl p-6 hover:-translate-y-1 hover:border-white/[0.12] hover:shadow-[0_8px_32px_rgba(0,229,176,0.06)] transition-all duration-250 relative overflow-hidden"
+      className="glass sheen lift rounded-[var(--r-md)] relative p-6 hover:-translate-y-1 hover:border-white/[0.12] hover:shadow-[0_8px_32px_rgba(0,229,176,0.06)] transition-all duration-250 relative overflow-hidden"
     >
       <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-[#00e5b0]/25 to-transparent" />
       <div className="text-[#00e5b0]/70 mb-4">{card.icon}</div>
@@ -403,7 +403,7 @@ export default function DashboardPage() {
           initial={{ opacity: 0, y: 20 }}
           animate={inView ? { opacity: 1, y: 0 } : {}}
           transition={{ duration: 0.5, delay: 0.42, ease: [0.16, 1, 0.3, 1] }}
-          className="bg-white/[0.03] border border-white/[0.07] rounded-2xl p-6"
+          className="glass sheen lift rounded-[var(--r-md)] relative p-6"
         >
           <p className="text-[13px] font-semibold text-white/60 mb-5 flex items-center gap-2">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.7} className="w-4 h-4 text-[#00e5b0]"><path strokeLinecap="round" strokeLinejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z"/></svg>
@@ -431,7 +431,7 @@ export default function DashboardPage() {
           initial={{ opacity: 0, y: 20 }}
           animate={inView ? { opacity: 1, y: 0 } : {}}
           transition={{ duration: 0.5, delay: 0.48, ease: [0.16, 1, 0.3, 1] }}
-          className="bg-white/[0.03] border border-white/[0.07] rounded-2xl p-6"
+          className="glass sheen lift rounded-[var(--r-md)] relative p-6"
         >
           <p className="text-[13px] font-semibold text-white/60 mb-5 flex items-center gap-2">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.7} className="w-4 h-4 text-[#00e5b0]"><path strokeLinecap="round" strokeLinejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z"/></svg>

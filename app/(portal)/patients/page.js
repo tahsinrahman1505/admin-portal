@@ -187,7 +187,7 @@ export default function PatientsPage() {
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.45, delay: 0.1 }}
-        className="bg-white/[0.02] border border-white/[0.07] rounded-2xl overflow-hidden"
+        className="glass sheen rounded-[var(--r-md)] relative overflow-hidden"
       >
         <div className="overflow-x-auto">
           <table className="w-full">
@@ -280,7 +280,7 @@ export default function PatientsPage() {
               animate={{ x: 0 }}
               exit={{ x: '100%' }}
               transition={{ duration: 0.32, ease: [0.16, 1, 0.3, 1] }}
-              className="fixed right-0 top-0 h-full w-[420px] bg-[#0e1c22] border-l border-white/[0.08] z-50 flex flex-col shadow-2xl"
+              className="fixed right-0 top-0 h-full w-[420px] glass-overlay sheen border-l border-white/[0.08] z-50 flex flex-col shadow-2xl"
             >
               {/* Drawer header */}
               <div className="flex items-center justify-between px-6 py-5 border-b border-white/[0.06]">

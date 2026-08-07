@@ -12,6 +12,12 @@ const nextConfig = {
 
   // ── Security headers — applied to every response [F1] ──────────────────
   async headers() {
+    // Demo build frames its own pages (the /mobile phone view iframes the inbox),
+    // so it needs same-origin framing. Production stays fully locked (DENY / 'none')
+    // to prevent clickjacking of the real admin portal. Gated by NEXT_PUBLIC_DEMO_MODE.
+    const isDemo = process.env.NEXT_PUBLIC_DEMO_MODE === 'true'
+    const frameAncestors = isDemo ? "frame-ancestors 'self'" : "frame-ancestors 'none'"
+    const xFrameOptions = isDemo ? 'SAMEORIGIN' : 'DENY'
     return [
       {
         source: '/(.*)',
@@ -22,12 +28,19 @@ const nextConfig = {
             // 'unsafe-inline' required by Next.js inline scripts/styles in production.
             value: [
               "default-src 'self'",
-              "script-src 'self' 'unsafe-inline' 'unsafe-eval'",  // unsafe-eval needed by Next.js
+              // connect.facebook.net: the Meta JS SDK, needed for the Connect
+              // WhatsApp (Embedded Signup) button on the Channels page.
+              "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://connect.facebook.net",
               "style-src 'self' 'unsafe-inline'",
-              "img-src 'self' data: blob:",
+              "img-src 'self' data: blob: https://*.fbcdn.net",
               "font-src 'self' data:",
-              "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://n8n.mdtahsinrahman.com",
-              "frame-ancestors 'none'",
+              // graph.facebook.com + www.facebook.com: the FB SDK's own runtime
+              // calls during the Embedded Signup popup flow.
+              "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://n8n.mdtahsinrahman.com https://graph.facebook.com https://www.facebook.com",
+              // The FB SDK uses a hidden iframe for session/cookie checks
+              // separate from the FB.login() popup itself.
+              "frame-src https://www.facebook.com https://staticxx.facebook.com",
+              frameAncestors,
               "base-uri 'self'",
               "form-action 'self'",
             ].join('; '),
@@ -46,7 +59,7 @@ const nextConfig = {
           },
           {
             key: 'X-Frame-Options',
-            value: 'DENY',
+            value: xFrameOptions,
           },
         ],
       },

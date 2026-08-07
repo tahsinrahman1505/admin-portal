@@ -62,7 +62,7 @@ export default function LeadsPage() {
         </button>
       </div>
 
-      <div className="overflow-x-auto rounded-2xl border border-white/[0.07]">
+      <div className="overflow-x-auto glass sheen rounded-[var(--r-md)] relative">
         <table className="w-full text-[13px]">
           <thead className="border-b border-white/[0.07]">
             <tr>

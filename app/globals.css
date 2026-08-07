@@ -1,9 +1,114 @@
 @import "tailwindcss";
 
-:root {
-  --background: #080808;
-  --foreground: #f0f0f0;
+/* ═══════════════════════════════════════════════════════════════════════════
+   AURORA GLASS — the admin-portal design system
+   Obsidian base · a slow living aurora behind frosted-glass surfaces ·
+   specular edge-lighting · a spring-physics motion vocabulary.
+   Authored dark-first; every colour is a token so the whole system can be
+   retuned from here. LIGHT MODE is a first-class second theme (not an
+   afterthought): the same aurora + glass language, re-tuned to a luminous
+   base — see the :root[data-theme="light"] block below. The theme is applied
+   by data-theme on <html> (default dark; public/theme-init.js sets it before
+   paint), and ThemeToggle flips it.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+:root,
+:root[data-theme="dark"] {
+  /* Base ---------------------------------------------------------------- */
+  --bg-base: #05070a;          /* obsidian, faintly blue-black */
+  --background: #05070a;
+  --foreground: #eef1f6;
+  --color-white: #ffffff;      /* the foreground ink behind every white/[opacity] utility */
+  --aurora-strength: 1;        /* multiplier on the aurora blob opacities */
+  --scrollbar-thumb: rgba(255,255,255,0.10);
+  --vignette: rgba(5,7,10,0.55);
+  --overlay-bg: rgba(13, 16, 21, 0.975);   /* near-solid: popovers over busy content */
+
+  /* Aurora palette (the drifting light behind the glass) ---------------- */
+  --aurora-teal:   #00e5b0;
+  --aurora-cyan:   #22d3ee;
+  --aurora-violet: #7c5cff;
+  --aurora-blue:   #2563eb;
+  --accent:        #00e5b0;    /* brand mint — the single load-bearing accent */
+  --accent-soft:   rgba(0, 229, 176, 0.14);
+
+  /* Glass surfaces ------------------------------------------------------ */
+  --glass-bg:        rgba(255, 255, 255, 0.045);
+  --glass-bg-strong: rgba(255, 255, 255, 0.07);
+  --glass-border:    rgba(255, 255, 255, 0.09);
+  --glass-edge:      rgba(255, 255, 255, 0.16);   /* specular top-edge highlight */
+  --glass-blur:      20px;
+
+  /* Ink scale (text) ---------------------------------------------------- */
+  --ink-1: rgba(238, 241, 246, 0.96);   /* primary */
+  --ink-2: rgba(238, 241, 246, 0.62);   /* secondary */
+  --ink-3: rgba(238, 241, 246, 0.40);   /* tertiary / labels */
+  --ink-4: rgba(238, 241, 246, 0.22);   /* faint */
+
+  /* Elevation ----------------------------------------------------------- */
+  --shadow-sm: 0 1px 2px rgba(0,0,0,0.35);
+  --shadow-md: 0 8px 32px rgba(0,0,0,0.40), 0 2px 8px rgba(0,0,0,0.30);
+  --shadow-lg: 0 24px 70px rgba(0,0,0,0.55), 0 8px 24px rgba(0,0,0,0.35);
+  --glow-accent: 0 0 0 1px rgba(0,229,176,0.20), 0 8px 40px rgba(0,229,176,0.14);
+
+  /* Radii --------------------------------------------------------------- */
+  --r-sm: 12px;
+  --r-md: 18px;
+  --r-lg: 24px;
+
+  /* Motion -------------------------------------------------------------- */
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
 }
+
+/* ── LIGHT THEME ─────────────────────────────────────────────────────────────
+   Same aurora + glass language, re-tuned to a luminous base. The glass becomes
+   frosted WHITE (opaque enough to read on a light ground), the ink flips to
+   near-black, and --color-white flips too so every white/[opacity] utility in
+   the pages inverts to a dark tint automatically — no per-page rewrite. The
+   aurora is softened (--aurora-strength) so it's a pastel wash, not a glare. */
+:root[data-theme="light"] {
+  --bg-base: #eef1f7;          /* soft luminous off-white, faint cool cast */
+  --background: #eef1f7;
+  --foreground: #101317;
+  --color-white: #0d1117;      /* inverts white/[opacity] surfaces + text to dark */
+  --aurora-strength: 0.5;      /* halve the aurora so light mode stays calm */
+  --scrollbar-thumb: rgba(0,0,0,0.16);
+  --vignette: rgba(226,230,238,0.6);
+  --overlay-bg: rgba(252, 253, 255, 0.96);   /* near-solid white overlay */
+
+  /* Aurora tints — lighter, so the wash reads on a bright ground */
+  --aurora-teal:   #34e3bf;
+  --aurora-cyan:   #5fd6ef;
+  --aurora-violet: #9d84ff;
+
+  /* Frosted white glass */
+  --glass-bg:        rgba(255, 255, 255, 0.58);
+  --glass-bg-strong: rgba(255, 255, 255, 0.78);
+  --glass-border:    rgba(16, 19, 23, 0.08);
+  --glass-edge:      rgba(255, 255, 255, 0.9);   /* bright specular on white glass */
+
+  /* Ink flips to near-black at the same opacity stops */
+  --ink-1: rgba(16, 19, 23, 0.92);
+  --ink-2: rgba(16, 19, 23, 0.60);
+  --ink-3: rgba(16, 19, 23, 0.42);
+  --ink-4: rgba(16, 19, 23, 0.24);
+
+  /* Softer shadows on a light ground */
+  --shadow-sm: 0 1px 2px rgba(16,19,23,0.06);
+  --shadow-md: 0 8px 30px rgba(16,19,23,0.10), 0 2px 8px rgba(16,19,23,0.06);
+  --shadow-lg: 0 24px 60px rgba(16,19,23,0.14), 0 8px 24px rgba(16,19,23,0.08);
+  --glow-accent: 0 0 0 1px rgba(0,145,110,0.22), 0 8px 30px rgba(0,145,110,0.14);
+}
+
+/* The brand mint reads well on obsidian but fails contrast as text on light.
+   Arbitrary-value classes can't be re-tokenised, so match by class substring
+   (specificity beats the utility) and darken only TEXT usages; mint fills and
+   borders stay mint and still look right on the light ground. */
+:root[data-theme="light"] [class*="text-[#00e5b0]"] { color: #00916e; }
 
 @theme inline {
   --color-background: var(--background);
@@ -11,37 +116,119 @@
   --font-sans: var(--font-jakarta);
 }
 
+html { background: var(--bg-base); }
+
 body {
-  background: var(--background);
+  background: var(--bg-base);
   color: var(--foreground);
   font-family: var(--font-jakarta), system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  transition: background-color 0.3s var(--ease-out), color 0.3s var(--ease-out);
 }
 
 * { box-sizing: border-box; }
 
-/* ── Themed scrollbars ───────────────────────────────────────────────────── */
-::-webkit-scrollbar {
-  width: 4px;
-  height: 4px;
+/* ── Glass surfaces ─────────────────────────────────────────────────────────
+   .glass          — standard frosted panel (cards, sidebar, modals)
+   .glass-strong   — denser, for controls that must read against busy aurora
+   The inset top highlight is the specular edge; the layered shadow lifts it.  */
+.glass {
+  background: var(--glass-bg);
+  backdrop-filter: blur(var(--glass-blur)) saturate(1.4);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(1.4);
+  border: 1px solid var(--glass-border);
+  box-shadow:
+    inset 0 1px 0 0 var(--glass-edge),
+    var(--shadow-md);
 }
-::-webkit-scrollbar-track {
-  background: transparent;
+.glass-strong {
+  background: var(--glass-bg-strong);
+  backdrop-filter: blur(28px) saturate(1.5);
+  -webkit-backdrop-filter: blur(28px) saturate(1.5);
+  border: 1px solid var(--glass-border);
+  box-shadow: inset 0 1px 0 0 var(--glass-edge), var(--shadow-lg);
 }
+/* .glass-overlay — for popovers/menus/modals that float OVER busy page content
+   (notifications, ⌘K palette, drawers). Near-solid so the content behind is
+   obscured and text stays crisp; a light blur keeps the glass character. Use the
+   translucent .glass/.glass-strong only over the calm aurora, not over content. */
+.glass-overlay {
+  background: var(--overlay-bg);
+  backdrop-filter: blur(24px) saturate(1.4);
+  -webkit-backdrop-filter: blur(24px) saturate(1.4);
+  border: 1px solid var(--glass-border);
+  box-shadow: inset 0 1px 0 0 var(--glass-edge), var(--shadow-lg);
+}
+
+/* A hairline gradient sheen along the top edge — the detail that reads
+   "designed", not "div with a border". Opt-in via .sheen on a relative box. */
+.sheen::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--glass-edge), transparent);
+  pointer-events: none;
+}
+
+/* Interactive lift — cards/rows that respond to the cursor. */
+.lift {
+  transition: transform 0.35s var(--ease-out), box-shadow 0.35s var(--ease-out),
+              border-color 0.35s var(--ease-out), background 0.35s var(--ease-out);
+  will-change: transform;
+}
+.lift:hover {
+  transform: translateY(-2px);
+  border-color: rgba(255,255,255,0.16);
+  box-shadow: inset 0 1px 0 0 var(--glass-edge), var(--shadow-lg);
+}
+
+/* Accent focus ring — consistent, visible, on-brand. */
+:where(a, button, input, textarea, select, [tabindex]):focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--bg-base), 0 0 0 4px rgba(0,229,176,0.55);
+  border-radius: 8px;
+}
+
+/* ── Scrollbars ─────────────────────────────────────────────────────────── */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--scrollbar-thumb);
   border-radius: 99px;
   transition: background 0.2s;
 }
-::-webkit-scrollbar-thumb:hover {
-  background: rgba(0, 229, 176, 0.4);
+::-webkit-scrollbar-thumb:hover { background: rgba(0,229,176,0.5); }
+::-webkit-scrollbar-corner { background: transparent; }
+* { scrollbar-width: thin; scrollbar-color: var(--scrollbar-thumb) transparent; }
+
+/* ── Aurora drift ───────────────────────────────────────────────────────────
+   Three blurred colour fields orbit slowly on the GPU (transform + opacity
+   only — no layout, no paint storms). Rendered by <AuroraBackground/>.        */
+@keyframes aurora-drift-a {
+  0%,100% { transform: translate3d(-8%, -6%, 0) scale(1.05); }
+  50%     { transform: translate3d(6%, 4%, 0)  scale(1.25); }
 }
-::-webkit-scrollbar-corner {
-  background: transparent;
+@keyframes aurora-drift-b {
+  0%,100% { transform: translate3d(10%, 8%, 0)  scale(1.15); }
+  50%     { transform: translate3d(-6%, -8%, 0) scale(0.95); }
+}
+@keyframes aurora-drift-c {
+  0%,100% { transform: translate3d(4%, -10%, 0) scale(1.0); }
+  50%     { transform: translate3d(-8%, 8%, 0)  scale(1.2); }
+}
+@keyframes aurora-breathe {
+  0%,100% { opacity: 0.55; }
+  50%     { opacity: 0.8; }
 }
 
-/* Firefox */
-* {
-  scrollbar-width: thin;
-  scrollbar-color: rgba(255, 255, 255, 0.08) transparent;
+/* Honour reduced-motion: freeze the aurora, keep the atmosphere. */
+@media (prefers-reduced-motion: reduce) {
+  .aurora-blob { animation: none !important; }
+  .lift { transition: none; }
+  * { scroll-behavior: auto; }
 }
+
+/* Utility: tabular figures wherever numbers align. */
+.tnum { font-variant-numeric: tabular-nums; }

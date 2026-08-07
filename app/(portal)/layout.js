@@ -3,11 +3,48 @@
 import { useEffect, useState } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
 import Link from 'next/link'
+import { motion } from 'framer-motion'
 import { supabase } from '@/lib/supabase'
 import RealtimeToast from '@/components/RealtimeToast'
 import NotificationBell from '@/components/NotificationBell'
+import AuroraBackground from '@/components/AuroraBackground'
+import CommandPalette from '@/components/CommandPalette'
+import ThemeToggle from '@/components/ThemeToggle'
+
+/* Nav row with a shared-layout active pill: the highlight physically slides
+   from the old item to the new one on navigation (layoutId), instead of just
+   toggling. Small detail, big "this was designed" signal. */
+function NavItem({ item, active }) {
+  return (
+    <Link
+      href={item.href}
+      className={`group relative flex items-center gap-3 px-3 py-2.5 rounded-xl text-[13.5px] transition-colors duration-200 ${
+        active ? 'text-[#00e5b0]' : 'text-[var(--ink-2)] hover:text-[var(--ink-1)]'
+      }`}
+      style={{ fontFamily: 'var(--font-jakarta)' }}
+    >
+      {active && (
+        <motion.span
+          layoutId="nav-active-pill"
+          className="absolute inset-0 rounded-xl"
+          style={{ background: 'var(--accent-soft)', boxShadow: 'inset 0 1px 0 0 rgba(0,229,176,0.20)' }}
+          transition={{ type: 'spring', stiffness: 380, damping: 32 }}
+        />
+      )}
+      <span className={`relative z-10 transition-colors duration-200 ${active ? 'text-[#00e5b0]' : 'text-[var(--ink-3)] group-hover:text-[var(--ink-2)]'}`}>
+        {item.icon}
+      </span>
+      <span className="relative z-10">{item.label}</span>
+      {active && <span className="relative z-10 ml-auto w-1.5 h-1.5 rounded-full bg-[#00e5b0] shadow-[0_0_8px_rgba(0,229,176,0.8)]" />}
+    </Link>
+  )
+}
 
 const NAV = [
+  {
+    label: 'Copilot', href: '/copilot',
+    icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.7} className="w-[18px] h-[18px]"><path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456z"/></svg>,
+  },
   {
     label: 'Dashboard', href: '/dashboard',
     icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.7} className="w-[18px] h-[18px]"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>,
@@ -27,6 +64,10 @@ const NAV = [
   {
     label: 'Patients', href: '/patients',
     icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.7} className="w-[18px] h-[18px]"><path strokeLinecap="round" strokeLinejoin="round" d="M18 18.72a9.094 9.094 0 003.741-.479 3 3 0 00-4.682-2.72m.94 3.198l.001.031c0 .225-.012.447-.037.666A11.944 11.944 0 0112 21c-2.17 0-4.207-.576-5.963-1.584A6.062 6.062 0 016 18.719m12 0a5.971 5.971 0 00-.941-3.197m0 0A5.995 5.995 0 0012 12.75a5.995 5.995 0 00-5.058 2.772m0 0a3 3 0 00-4.681 2.72 8.986 8.986 0 003.74.477m.94-3.197a5.971 5.971 0 00-.94 3.197M15 6.75a3 3 0 11-6 0 3 3 0 016 0zm6 3a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0zm-13.5 0a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0z"/></svg>,
+  },
+  {
+    label: 'Recall', href: '/recall',
+    icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.7} className="w-[18px] h-[18px]"><path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99"/></svg>,
   },
   {
     label: 'Analytics', href: '/analytics',
@@ -176,131 +217,103 @@ export default function PortalLayout({ children }) {
     router.push('/login')
   }
 
+  const GROUPS = [
+    { label: 'Main', items: NAV.slice(0, 5) },      // Copilot, Dashboard, Conversations, Leads, Bookings
+    { label: 'Insights', items: NAV.slice(5, 9) },  // Patients, Recall, Analytics, Activity
+    { label: 'Config', items: NAV.slice(9) },       // Knowledge Base, Channels, Team, Settings
+  ]
+
   return (
-    <div className="flex h-screen bg-[#080808] overflow-hidden">
-      {/* Sidebar */}
-      <aside className="w-[228px] shrink-0 flex flex-col bg-white/[0.02] border-r border-white/[0.06]">
-        {/* Logo */}
-        <div className="px-4 pt-7 pb-6">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2.5">
-              <div className="w-7 h-7 rounded-lg bg-[#00e5b0]/10 border border-[#00e5b0]/25 flex items-center justify-center shrink-0">
-                <span className="text-[#00e5b0] text-[11px] font-extrabold" style={{ fontFamily: 'var(--font-jakarta)' }}>T</span>
+    <>
+      <AuroraBackground />
+      <CommandPalette />
+      <div className="flex h-screen overflow-hidden">
+        {/* Sidebar — floating glass rail */}
+        <aside className="w-[236px] shrink-0 p-3">
+          {/* No overflow-hidden here: the notification dropdown (rendered inside
+              this rail) must be able to extend past the sidebar edge. The rail's
+              own glass bg/border already respect the border-radius, and all inner
+              content is inset by padding, so the rounded corners stay clean. */}
+          <div className="glass sheen rounded-[var(--r-lg)] h-full flex flex-col">
+            {/* Logo */}
+            <div className="px-4 pt-6 pb-5">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-[11px] flex items-center justify-center shrink-0"
+                       style={{ background: 'linear-gradient(135deg, rgba(0,229,176,0.22), rgba(124,92,255,0.18))', border: '1px solid rgba(0,229,176,0.3)', boxShadow: '0 0 20px rgba(0,229,176,0.18)' }}>
+                    <span className="text-[#00e5b0] text-[12px] font-extrabold" style={{ fontFamily: 'var(--font-jakarta)' }}>T</span>
+                  </div>
+                  <span className="text-[var(--ink-1)] font-extrabold text-[15px] tracking-tight" style={{ fontFamily: 'var(--font-jakarta)' }}>
+                    Tahsin<span className="text-[#00e5b0]">.</span>ai
+                  </span>
+                </div>
+                <NotificationBell clientId={clientId} />
               </div>
-              <span className="text-white font-extrabold text-[15px] tracking-tight" style={{ fontFamily: 'var(--font-jakarta)' }}>
-                Tahsin<span className="text-[#00e5b0]">.</span>ai
-              </span>
+              <p className="text-[var(--ink-3)] text-[10.5px] mt-2 ml-[2px] tracking-wide" style={{ fontFamily: 'var(--font-jakarta)' }}>
+                Client Portal
+              </p>
             </div>
-            <NotificationBell clientId={clientId} />
+
+            {/* ⌘K trigger — dispatches the same hotkey the palette listens for */}
+            <div className="px-3 pb-3">
+              <button
+                onClick={() => {
+                  const isMac = navigator.platform.toUpperCase().includes('MAC')
+                  window.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', metaKey: isMac, ctrlKey: !isMac, bubbles: true }))
+                }}
+                className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl bg-white/[0.03] border border-white/[0.07] text-[var(--ink-3)] hover:text-[var(--ink-1)] hover:border-white/[0.12] transition-colors duration-200"
+                style={{ fontFamily: 'var(--font-jakarta)' }}
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.7} className="w-3.5 h-3.5 shrink-0">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35M17 11a6 6 0 11-12 0 6 6 0 0112 0z" />
+                </svg>
+                <span className="text-[12.5px]">Search…</span>
+                <kbd className="ml-auto text-[10px] border border-white/[0.12] rounded px-1.5 py-0.5 tnum">⌘K</kbd>
+              </button>
+            </div>
+
+            {/* Nav */}
+            <nav className="flex-1 px-3 overflow-y-auto space-y-0.5 pb-2">
+              {GROUPS.map((group, gi) => (
+                <div key={group.label}>
+                  <p className={`text-[10px] font-semibold text-[var(--ink-4)] uppercase tracking-[0.14em] px-3 mb-2 ${gi > 0 ? 'pt-4' : ''}`} style={{ fontFamily: 'var(--font-jakarta)' }}>
+                    {group.label}
+                  </p>
+                  {group.items.map(item => (
+                    <NavItem key={item.href} item={item} active={pathname === item.href} />
+                  ))}
+                </div>
+              ))}
+            </nav>
+
+            {/* Bottom */}
+            <div className="px-3 pb-4 pt-4 mx-3 border-t border-white/[0.06]">
+              <p className="text-[11px] text-[var(--ink-3)] px-1 mb-2.5 truncate" style={{ fontFamily: 'var(--font-jakarta)' }}>
+                {userEmail}
+              </p>
+              <div className="mb-1"><ThemeToggle /></div>
+              <button
+                onClick={handleLogout}
+                className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-[13px] text-[var(--ink-2)] hover:text-red-400 hover:bg-red-400/[0.08] transition-all duration-200"
+                style={{ fontFamily: 'var(--font-jakarta)' }}
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.7} className="w-4 h-4">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15M12 9l-3 3m0 0l3 3m-3-3h12.75"/>
+                </svg>
+                Sign out
+              </button>
+            </div>
           </div>
-          <p className="text-white/20 text-[10.5px] mt-2 ml-[2px]" style={{ fontFamily: 'var(--font-jakarta)' }}>
-            Client Portal
-          </p>
-        </div>
+        </aside>
 
-        {/* Nav */}
-        <nav className="flex-1 px-3 overflow-y-auto space-y-0.5 pb-2">
-          <p className="text-[10px] font-semibold text-white/20 uppercase tracking-[0.12em] px-3 mb-2" style={{ fontFamily: 'var(--font-jakarta)' }}>
-            Main
-          </p>
-          {NAV.slice(0, 4).map(item => {
-            const isActive = pathname === item.href
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-[13.5px] transition-all duration-150 ${
-                  isActive
-                    ? 'bg-[#00e5b0]/[0.1] text-[#00e5b0]'
-                    : 'text-white/40 hover:text-white/75 hover:bg-white/[0.04]'
-                }`}
-                style={{ fontFamily: 'var(--font-jakarta)' }}
-              >
-                <span className={isActive ? 'text-[#00e5b0]' : 'text-white/30'}>{item.icon}</span>
-                {item.label}
-                {isActive && (
-                  <span className="ml-auto w-1 h-1 rounded-full bg-[#00e5b0]" />
-                )}
-              </Link>
-            )
-          })}
+        {/* Main */}
+        <main className="flex-1 overflow-auto">
+          {children}
+        </main>
 
-          <p className="text-[10px] font-semibold text-white/20 uppercase tracking-[0.12em] px-3 pt-4 mb-2" style={{ fontFamily: 'var(--font-jakarta)' }}>
-            Insights
-          </p>
-          {NAV.slice(4, 7).map(item => {
-            const isActive = pathname === item.href
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-[13.5px] transition-all duration-150 ${
-                  isActive
-                    ? 'bg-[#00e5b0]/[0.1] text-[#00e5b0]'
-                    : 'text-white/40 hover:text-white/75 hover:bg-white/[0.04]'
-                }`}
-                style={{ fontFamily: 'var(--font-jakarta)' }}
-              >
-                <span className={isActive ? 'text-[#00e5b0]' : 'text-white/30'}>{item.icon}</span>
-                {item.label}
-                {isActive && (
-                  <span className="ml-auto w-1 h-1 rounded-full bg-[#00e5b0]" />
-                )}
-              </Link>
-            )
-          })}
-
-          <p className="text-[10px] font-semibold text-white/20 uppercase tracking-[0.12em] px-3 pt-4 mb-2" style={{ fontFamily: 'var(--font-jakarta)' }}>
-            Config
-          </p>
-          {NAV.slice(7).map(item => {
-            const isActive = pathname === item.href
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-[13.5px] transition-all duration-150 ${
-                  isActive
-                    ? 'bg-[#00e5b0]/[0.1] text-[#00e5b0]'
-                    : 'text-white/40 hover:text-white/75 hover:bg-white/[0.04]'
-                }`}
-                style={{ fontFamily: 'var(--font-jakarta)' }}
-              >
-                <span className={isActive ? 'text-[#00e5b0]' : 'text-white/30'}>{item.icon}</span>
-                {item.label}
-                {isActive && (
-                  <span className="ml-auto w-1 h-1 rounded-full bg-[#00e5b0]" />
-                )}
-              </Link>
-            )
-          })}
-        </nav>
-
-        {/* Bottom */}
-        <div className="px-3 pb-5 pt-4 border-t border-white/[0.05]">
-          <p className="text-[11px] text-white/20 px-3 mb-3 truncate" style={{ fontFamily: 'var(--font-jakarta)' }}>
-            {userEmail}
-          </p>
-          <button
-            onClick={handleLogout}
-            className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-[13px] text-white/35 hover:text-red-400 hover:bg-red-400/[0.07] transition-all duration-150"
-            style={{ fontFamily: 'var(--font-jakarta)' }}
-          >
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.7} className="w-4 h-4">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15M12 9l-3 3m0 0l3 3m-3-3h12.75"/>
-            </svg>
-            Sign out
-          </button>
-        </div>
-      </aside>
-
-      {/* Main */}
-      <main className="flex-1 overflow-auto bg-[#080808]">
-        {children}
-      </main>
-
-      {/* Global realtime toast */}
-      <RealtimeToast />
-    </div>
+        {/* Global realtime toast */}
+        <RealtimeToast />
+      </div>
+    </>
   )
 }

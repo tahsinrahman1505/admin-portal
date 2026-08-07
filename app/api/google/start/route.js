@@ -13,8 +13,8 @@
  */
 import { NextResponse } from 'next/server'
 import crypto from 'crypto'
+import { getAuthedUser, unauthorized, forbidden } from '@/lib/auth'
 
-const CLIENT_ID = process.env.NEXT_PUBLIC_CLIENT_ID || 'default'
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_OAUTH_CLIENT_ID || ''
 const SCOPE = 'https://www.googleapis.com/auth/calendar'
 
@@ -33,13 +33,23 @@ export async function GET(request) {
     )
   }
 
+  // Require a real, clinic-mapped session before starting an OAuth connect. This
+  // route writes a Google refresh token to client_configs WHERE client_id = state.c
+  // in the callback, so a caller with no clinic (self-registered account) or a
+  // forged-but-unverifiable cookie must not be able to initiate a connect against
+  // a fallback clinic. (Previously fell back to NEXT_PUBLIC_CLIENT_ID.)
+  const auth = await getAuthedUser(request)
+  if (!auth) return unauthorized()
+  if (!auth.botClientId) return forbidden('No clinic associated with this account')
+  const clientId = auth.botClientId
+
   const { searchParams } = new URL(request.url)
   const doctorId = searchParams.get('doctor_id') || ''
   const nonce = crypto.randomBytes(16).toString('hex')
 
   // state carries: clinic client_id, optional doctor_id, and the CSRF nonce.
   const state = Buffer.from(
-    JSON.stringify({ c: CLIENT_ID, d: doctorId, n: nonce }),
+    JSON.stringify({ c: clientId, d: doctorId, n: nonce }),
   ).toString('base64url')
 
   const params = new URLSearchParams({

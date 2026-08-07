@@ -42,6 +42,13 @@ function isLiveSession(value) {
 export function middleware(request) {
   const { pathname } = request.nextUrl
 
+  // Demo mode (demo.tahsinai.com): zero-login showcase. Let every request through
+  // — there is no real data or secret behind it (mock supabase client + seeded
+  // /api/rag responses). Gated by NEXT_PUBLIC_DEMO_MODE so production is untouched.
+  if (process.env.NEXT_PUBLIC_DEMO_MODE === 'true') {
+    return NextResponse.next()
+  }
+
   // Always allow: login page, Next.js internals, static files only.
   // NOTE: /api/* is intentionally NOT whitelisted — all proxy routes
   // (/api/rag/*) require authentication to prevent unauthenticated access

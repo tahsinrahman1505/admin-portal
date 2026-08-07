@@ -1,13 +1,12 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { createClient } from '@supabase/supabase-js';
+import { resolveBotClientId } from '@/lib/clientId';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 );
-
-const CLIENT_ID = process.env.NEXT_PUBLIC_CLIENT_ID ?? 'default';
 
 export default function SettingsPage() {
   const [config, setConfig] = useState({
@@ -23,10 +22,14 @@ export default function SettingsPage() {
   const [saved, setSaved] = useState(false);
   const [gcalMsg, setGcalMsg] = useState(null);
   const [gcalBusy, setGcalBusy] = useState(false);
+  // Resolved from the logged-in user (multi-tenant), not a build-time env var.
+  const [clientId, setClientId] = useState(null);
 
   useEffect(() => {
     async function load() {
-      const { data } = await supabase.from('client_configs').select('*').eq('client_id', CLIENT_ID).single();
+      const cid = await resolveBotClientId();
+      setClientId(cid);
+      const { data } = await supabase.from('client_configs').select('*').eq('client_id', cid).single();
       if (data) setConfig(data);
       setLoading(false);
     }
@@ -62,7 +65,8 @@ export default function SettingsPage() {
 
   async function handleSave() {
     setSaving(true);
-    const { error } = await supabase.from('client_configs').upsert({ ...config, client_id: CLIENT_ID });
+    const cid = clientId || await resolveBotClientId();
+    const { error } = await supabase.from('client_configs').upsert({ ...config, client_id: cid });
     setSaving(false);
     if (!error) { setSaved(true); setTimeout(() => setSaved(false), 3000); }
     else alert('Save failed: ' + error.message);
@@ -106,7 +110,7 @@ export default function SettingsPage() {
         </div>
 
         {/* Toggles */}
-        <div className="bg-white/[0.02] border border-white/[0.07] rounded-2xl divide-y divide-white/[0.05]">
+        <div className="glass sheen rounded-[var(--r-md)] relative divide-y divide-white/[0.05]">
           {[
             { key: 'booking_enabled',              label: 'Booking feature',         desc: 'Allow the bot to book appointments' },
             { key: 'lead_qualification_enabled',   label: 'Lead qualification flow', desc: 'Collect name, phone, service interest and budget' },
@@ -132,7 +136,7 @@ export default function SettingsPage() {
         </div>
 
         {/* Google Calendar connect */}
-        <div className="bg-white/[0.02] border border-white/[0.07] rounded-2xl px-5 py-4">
+        <div className="glass sheen rounded-[var(--r-md)] relative px-5 py-4">
           <div className="flex items-center justify-between gap-4">
             <div className="min-w-0">
               <p className="text-[13.5px] font-medium text-white/80">Google Calendar</p>

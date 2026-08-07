@@ -14,6 +14,7 @@
  */
 
 import { Avatar, ChannelBadge, ContextPanel, ContextSection, EmptyState } from '@/components/ui'
+import { PrioritySelector, AssigneeSelector, TagPicker } from '@/components/triage'
 import { maskIdentity, formatTimestamp } from '@/lib/inbox'
 
 function Spinner({ size = 12, color = 'var(--ink-1)', trackColor = 'var(--ink-4)' }) {
@@ -26,7 +27,13 @@ function Spinner({ size = 12, color = 'var(--ink-1)', trackColor = 'var(--ink-4)
   )
 }
 
-export default function PatientContext({ thread, messageCount, summary, summarizing, onSummarize, onDismissSummary }) {
+export default function PatientContext({
+  thread, messageCount, summary, summarizing, onSummarize, onDismissSummary,
+  // Triage — all optional so this component still works before a caller wires
+  // them in (matches how `summary` etc. above already degrade gracefully).
+  triageStatus, priority, assigneeId, tags, staff, tagCatalogue,
+  onSetTriageStatus, onSetPriority, onSetAssignee, onAddTag, onRemoveTag, onCreateTag,
+}) {
   if (!thread) {
     return (
       <ContextPanel title="Patient Context">
@@ -59,6 +66,53 @@ export default function PatientContext({ thread, messageCount, summary, summariz
           {senderId}
         </p>
       </ContextSection>
+
+      {onSetPriority && (
+        <ContextSection label="Triage">
+          <div className="space-y-3">
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-[11.5px] text-[var(--ink-3)]">Priority</span>
+              <PrioritySelector value={priority ?? null} onChange={(p) => onSetPriority(thread.session_id, p)} size="sm" />
+            </div>
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-[11.5px] text-[var(--ink-3)]">Assigned to</span>
+              <AssigneeSelector
+                staff={staff || []}
+                value={assigneeId ?? null}
+                onChange={(id) => onSetAssignee(thread.session_id, id)}
+                size="sm"
+              />
+            </div>
+            <div>
+              <span className="text-[11.5px] text-[var(--ink-3)] block mb-1.5">Tags</span>
+              <TagPicker
+                tags={tags || []}
+                catalogue={tagCatalogue || []}
+                onAdd={(name) => onAddTag(thread.session_id, name)}
+                onRemove={(name) => onRemoveTag(thread.session_id, name)}
+                onCreateTag={async (name) => {
+                  const created = await onCreateTag(name)
+                  if (created) onAddTag(thread.session_id, created.name)
+                }}
+              />
+            </div>
+            {onSetTriageStatus && (
+              <button
+                type="button"
+                onClick={() => onSetTriageStatus(thread.session_id, triageStatus === 'resolved' ? 'open' : 'resolved')}
+                className="w-full mt-1 px-3 py-2 rounded-[var(--r-sm)] text-[12px] font-medium transition-colors"
+                style={
+                  triageStatus === 'resolved'
+                    ? { color: 'var(--ink-2)', background: 'var(--glass-bg-strong)' }
+                    : { color: 'var(--status-open)', background: 'var(--status-open-soft)' }
+                }
+              >
+                {triageStatus === 'resolved' ? 'Reopen conversation' : 'Mark resolved'}
+              </button>
+            )}
+          </div>
+        </ContextSection>
+      )}
 
       <ContextSection label="Conversation">
         <dl className="space-y-2">

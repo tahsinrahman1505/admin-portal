@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback, useRef, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { ConversationsSkeleton } from '@/components/Skeleton'
-import { EmptyState, StatusBadge } from '@/components/ui'
+import { EmptyState, StatusBadge, SegmentedTabs } from '@/components/ui'
 import { FolderRail, ThreadRow, MessageBubble, Composer, PatientContext } from '@/components/inbox'
 
 const API_URL     = '/api/rag'
@@ -21,6 +21,7 @@ import {
   buildDeliveryMap, buildThreads, filterThreads, channelCounts,
   formatTimestamp, CHANNEL_LABEL, byLastActive, statusToken,
 } from '@/lib/inbox'
+import { mergeMeta, filterByTriage, triageStatusCounts } from '@/lib/triage'
 
 // Upload constraints are enforced by the storage bucket; mirrored here only so a
 // too-large or wrong-type file fails fast with a friendly message.
@@ -46,6 +47,23 @@ export default function ConversationsPage() {
   const [selected, setSelected]         = useState(null)
   const [search, setSearch]             = useState('')
   const [channelTab, setChannelTab]     = useState('all')
+  // Triage: conversation_meta keyed by session_id, plus the two small
+  // per-clinic catalogues (staff for assignment, client_tags for the tag
+  // picker). See migrations/003_conversation_meta.sql and lib/triage.js.
+  const [metaBySession, setMetaBySession] = useState({})
+  const [staffList, setStaffList]         = useState([])
+  const [tagCatalogue, setTagCatalogue]   = useState([])
+  const [triageStatusTab, setTriageStatusTab] = useState('all')
+  // '' = no filter, 'any' = assigned to someone, 'null' = unassigned, or a staff id.
+  // Deliberately all STRINGS, never the bare JS value null — this state feeds an
+  // HTML <select>, whose option values are always strings, and lib/triage.js's
+  // filterByTriage separately uses the literal `null` to mean "unassigned"
+  // (see its docstring). Mixing the two null-shaped values caused a real bug
+  // here on first pass: the <select>'s "Unassigned" option submitted the STRING
+  // "null", which is truthy and doesn't structurally equal the `null` triage.js
+  // checks for — so the unassigned filter silently matched everything instead
+  // of nothing. Converted to the real `null` only at the filterByTriage call.
+  const [assigneeFilter, setAssigneeFilter]   = useState('')
   const [loading, setLoading]           = useState(true)
   const [handoffSessions, setHandoffSessions] = useState([]) // [{sender_id, channel, ...}]
   const [botClientId, setBotClientId]   = useState('')
@@ -125,6 +143,21 @@ export default function ConversationsPage() {
         setSelected(threadList[0])
         setLiveMessages(threadList[0].messages)
       }
+
+      // Triage catalogues + per-thread meta. All three are RLS-scoped to this
+      // clinic (see migrations/003_conversation_meta.sql) — no client_id filter
+      // needed here beyond what RLS already enforces, matching how `clients`/
+      // `conversations` are read elsewhere in this file.
+      const [metaRes, staffRes, tagsRes] = await Promise.all([
+        supabase.from('conversation_meta').select('*').eq('client_id', clientRow.id),
+        supabase.from('staff').select('*').eq('client_id', clientRow.id).order('name'),
+        supabase.from('client_tags').select('*').eq('client_id', clientRow.id).order('name'),
+      ])
+      if (metaRes.data) {
+        setMetaBySession(Object.fromEntries(metaRes.data.map(m => [m.session_id, m])))
+      }
+      if (staffRes.data) setStaffList(staffRes.data)
+      if (tagsRes.data) setTagCatalogue(tagsRes.data)
 
       await loadHandoffSessions(botCid)
       setLoading(false)
@@ -216,6 +249,34 @@ export default function ConversationsPage() {
     realtimeRef.current = channel
     return () => { supabase.removeChannel(channel) }
   }, [portalClientId, botClientId, loadHandoffSessions])
+
+  // ── Realtime: conversation_meta ──
+  // Separate channel from the conversations one above: different table, and a
+  // conversation_meta row is a simple upsert-by-session_id (no message-merging
+  // logic needed — INSERT and UPDATE can share one handler, unlike the
+  // conversations channel where reconcileMessage does real work).
+  useEffect(() => {
+    if (!portalClientId) return
+    const channel = supabase
+      .channel('conversation-meta')
+      .on('postgres_changes', {
+        event: '*', schema: 'public', table: 'conversation_meta',
+        filter: `client_id=eq.${portalClientId}`,
+      }, (payload) => {
+        if (payload.eventType === 'DELETE') {
+          setMetaBySession(prev => {
+            const next = { ...prev }
+            delete next[payload.old.session_id]
+            return next
+          })
+          return
+        }
+        const row = payload.new
+        setMetaBySession(prev => ({ ...prev, [row.session_id]: row }))
+      })
+      .subscribe()
+    return () => { supabase.removeChannel(channel) }
+  }, [portalClientId])
 
   // ── Switch liveMessages when the selected thread changes ──
   // Still an effect, deliberately. `liveMessages` is ALSO written by the realtime
@@ -377,6 +438,72 @@ export default function ConversationsPage() {
     if (selected) setSummaries(prev => ({ ...prev, [selected.session_id]: null }))
   }
 
+  // ── Triage mutations ──
+  // conversation_meta rows are created LAZILY, on the first triage action —
+  // not eagerly for every thread on load. Nothing else in the app needs a row
+  // to exist (lib/triage.js's mergeMeta defaults an absent row to
+  // open/no-priority/unassigned/no-tags), so an untouched thread never writes
+  // one. Every mutation therefore upserts rather than updates: the first
+  // action on a thread creates its row, every action after that updates it.
+  //
+  // Each setter applies an OPTIMISTIC local update before the request resolves
+  // — the realtime subscription above will confirm it moments later, but
+  // without this a click feels like it "did nothing" for the round-trip, which
+  // is exactly the complaint that drove the optimistic patterns already in
+  // this file (handleResume/handleTakeover/handleSend).
+  function upsertMeta(sessionId, patch) {
+    if (!portalClientId) return
+    setMetaBySession(prev => ({
+      ...prev,
+      [sessionId]: { ...(prev[sessionId] || { session_id: sessionId, client_id: portalClientId }), ...patch, updated_at: new Date().toISOString() },
+    }))
+    supabase.from('conversation_meta')
+      .upsert({ session_id: sessionId, client_id: portalClientId, ...patch, updated_at: new Date().toISOString() })
+      .then(({ error }) => { if (error) console.error('conversation_meta upsert failed:', error) })
+  }
+
+  function setThreadPriority(sessionId, priority) {
+    upsertMeta(sessionId, { priority })
+  }
+
+  function setThreadAssignee(sessionId, assigneeId) {
+    upsertMeta(sessionId, { assignee_id: assigneeId })
+  }
+
+  function setThreadTriageStatus(sessionId, status) {
+    upsertMeta(sessionId, { status, resolved_at: status === 'resolved' ? new Date().toISOString() : null })
+  }
+
+  function addThreadTag(sessionId, tagName) {
+    const current = metaBySession[sessionId]?.tags || []
+    if (current.includes(tagName)) return
+    upsertMeta(sessionId, { tags: [...current, tagName] })
+  }
+
+  function removeThreadTag(sessionId, tagName) {
+    const current = metaBySession[sessionId]?.tags || []
+    upsertMeta(sessionId, { tags: current.filter(t => t !== tagName) })
+  }
+
+  // Creating a brand-new tag is a separate table (client_tags is the per-clinic
+  // catalogue, not the array on conversation_meta) — optimistic here too, so
+  // typing a new tag and immediately applying it doesn't feel like two steps.
+  async function createTag(name, color = 'var(--accent)') {
+    if (!portalClientId) return null
+    const optimistic = { id: `opt_${Date.now()}`, client_id: portalClientId, name, color, created_at: new Date().toISOString() }
+    setTagCatalogue(prev => [...prev, optimistic])
+    const { data, error } = await supabase.from('client_tags')
+      .insert({ client_id: portalClientId, name, color })
+      .select().single()
+    if (error) {
+      console.error('client_tags insert failed:', error)
+      setTagCatalogue(prev => prev.filter(t => t.id !== optimistic.id))
+      return null
+    }
+    setTagCatalogue(prev => prev.map(t => t.id === optimistic.id ? data : t))
+    return data
+  }
+
   // ── AI Suggested reply (draft into the reply box; staff edits before sending) ──
   async function handleSuggest() {
     if (!selected || suggesting) return
@@ -507,8 +634,21 @@ export default function ConversationsPage() {
 
   // Counts for the folder rail, and the channel + search filter. Both live in
   // lib/inbox.js so the filter composition is unit-tested rather than trusted.
-  const counts   = channelCounts(threads)
-  const filtered = filterThreads(threads, { channel: channelTab, search })
+  const counts = channelCounts(threads)
+  // Triage meta merges onto every thread BEFORE any filtering, so an untriaged
+  // thread (no conversation_meta row yet) still carries the defaults
+  // mergeMeta assigns (triageStatus 'open', no priority, unassigned, no tags)
+  // and participates correctly in the Open tab / assignee filter rather than
+  // silently vanishing from every triage-aware view.
+  const withMeta = mergeMeta(threads, metaBySession)
+  const triageCounts = triageStatusCounts(withMeta)
+  const filtered = filterByTriage(
+    filterThreads(withMeta, { channel: channelTab, search }),
+    {
+      triageStatus: triageStatusTab,
+      ...(assigneeFilter !== '' ? { assigneeId: assigneeFilter === 'null' ? null : assigneeFilter } : {}),
+    },
+  )
 
   if (loading) return <ConversationsSkeleton />
 
@@ -517,6 +657,11 @@ export default function ConversationsPage() {
   const selectedChannel   = selected ? getThreadChannel(selected) : 'whatsapp'
   const channelLabel      = CHANNEL_LABEL[selectedChannel] || CHANNEL_LABEL.whatsapp
   const busyKey           = selected ? normalizeIdentity(selected.sender_id || selected.phone) : null
+  // Looked up fresh from `withMeta` rather than trusting fields already on
+  // `selected` — `selected` can have been set before conversation_meta finished
+  // loading, or before a realtime update landed, so its own .priority/.tags
+  // would be stale. This lookup is always current.
+  const selectedMeta = selected ? withMeta.find(t => t.session_id === selected.session_id) : null
 
   /* ── Four panes ────────────────────────────────────────────────────────────
      folders │ thread list │ chat │ patient context
@@ -554,6 +699,35 @@ export default function ConversationsPage() {
                        text-[var(--ink-1)] placeholder-[var(--ink-4)] outline-none
                        focus:border-[var(--accent)] transition-colors"
           />
+          <div className="mt-2.5 flex items-center gap-2">
+            <SegmentedTabs
+              size="sm"
+              value={triageStatusTab}
+              onChange={setTriageStatusTab}
+              options={[
+                { value: 'all', label: 'All', count: triageCounts.all },
+                { value: 'open', label: 'Open', count: triageCounts.open },
+                { value: 'pending', label: 'Pending', count: triageCounts.pending },
+                { value: 'resolved', label: 'Resolved', count: triageCounts.resolved },
+              ]}
+            />
+            {/* A native <select> here rather than a 4th custom popover — the
+                trigger/menu/keyboard/outside-click machinery the other three
+                selectors need doesn't earn its cost for a single-purpose list
+                filter, and a real <select> is free, accessible-by-default. */}
+            <select
+              aria-label="Filter by assignee"
+              value={assigneeFilter}
+              onChange={e => setAssigneeFilter(e.target.value)}
+              className="ml-auto shrink-0 bg-white/[0.04] border border-white/[0.08] rounded-lg px-2 py-1
+                         text-[11px] text-[var(--ink-2)] outline-none focus:border-[var(--accent)] transition-colors"
+            >
+              <option value="">Everyone</option>
+              <option value="any">Assigned</option>
+              <option value="null">Unassigned</option>
+              {staffList.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+            </select>
+          </div>
         </div>
 
         <div className="flex-1 overflow-y-auto" role="listbox" aria-label="Conversations">
@@ -676,6 +850,18 @@ export default function ConversationsPage() {
           summarizing={summarizing}
           onSummarize={handleSummarize}
           onDismissSummary={dismissSummary}
+          triageStatus={selectedMeta?.triageStatus}
+          priority={selectedMeta?.priority}
+          assigneeId={selectedMeta?.assigneeId}
+          tags={selectedMeta?.tags}
+          staff={staffList}
+          tagCatalogue={tagCatalogue}
+          onSetTriageStatus={setThreadTriageStatus}
+          onSetPriority={setThreadPriority}
+          onSetAssignee={setThreadAssignee}
+          onAddTag={addThreadTag}
+          onRemoveTag={removeThreadTag}
+          onCreateTag={createTag}
         />
       </div>
     </div>

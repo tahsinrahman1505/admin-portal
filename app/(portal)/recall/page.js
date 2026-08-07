@@ -103,6 +103,10 @@ export default function RecallPage() {
     setImporting(false)
   }
 
+  // Freshest possible "now" for due-date math on every render — an effect-set
+  // ref would lag behind (only updates on its own trigger, plus an extra
+  // render pass), which is worse for a due/overdue count than a direct read.
+  // eslint-disable-next-line react-hooks/purity -- wall-clock read needed fresh each render; caching it would make due/overdue counts go stale
   const now = Date.now()
   const stats = {
     total: rows.length,

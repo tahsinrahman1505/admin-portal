@@ -21,7 +21,12 @@ export default function KnowledgeBasePage() {
 
   async function fetchDocuments(cid) {
     try {
-      const res = await fetch(`${FASTAPI_URL}/ingest/list?client_id=${cid}`)
+      // `/ingest`, NOT `/ingest/list`. The GET handler lives at
+      // app/api/rag/ingest/route.js, so it serves `/api/rag/ingest`. Requesting
+      // `/ingest/list` matched the dynamic segment app/api/rag/ingest/[id]/
+      // instead (with id="list"), and that route only exports DELETE — so this
+      // fetch returned 405 and the document list silently rendered empty.
+      const res = await fetch(`${FASTAPI_URL}/ingest?client_id=${encodeURIComponent(cid)}`)
       const data = await res.json()
       setDocuments(data.documents || [])
     } catch { setDocuments([]) }

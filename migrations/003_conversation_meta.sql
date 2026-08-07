@@ -20,7 +20,7 @@
 -- have to be re-shaped to support it.
 create table if not exists public.staff (
   id         uuid primary key default gen_random_uuid(),
-  client_id  uuid not null references public.clients(id) on delete cascade,
+  client_id  bigint not null references public.clients(id) on delete cascade,
   user_id    uuid references auth.users(id) on delete set null,
   name       text not null,
   email      text,
@@ -45,7 +45,7 @@ comment on table public.staff is
 -- problem.
 create table if not exists public.conversation_meta (
   session_id   text primary key,
-  client_id    uuid not null references public.clients(id) on delete cascade,
+  client_id    bigint not null references public.clients(id) on delete cascade,
   status       text not null default 'open'
                  check (status in ('open', 'pending', 'resolved')),
   priority     text
@@ -64,7 +64,7 @@ comment on table public.conversation_meta is
 -- rather than free text that drifts into "vip"/"VIP"/"Vip" across a team.
 create table if not exists public.client_tags (
   id         uuid primary key default gen_random_uuid(),
-  client_id  uuid not null references public.clients(id) on delete cascade,
+  client_id  bigint not null references public.clients(id) on delete cascade,
   name       text not null,
   color      text not null default '#00e5b0',
   created_at timestamptz not null default now(),

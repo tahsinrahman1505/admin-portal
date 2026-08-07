@@ -1,12 +1,10 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { createClient } from '@supabase/supabase-js';
+// Shared, demo-aware client — see the note in leads/page.js. A local
+// createClient() here bypassed the demo mock and broke this page on the demo
+// deployment with a CSP connect-src violation.
+import { supabase } from '@/lib/supabase';
 import { resolveBotClientId } from '@/lib/clientId';
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-);
 
 export default function SettingsPage() {
   const [config, setConfig] = useState({
@@ -37,11 +35,15 @@ export default function SettingsPage() {
   }, []);
 
   // Surface the Google Calendar connect result after the OAuth redirect, then
-  // clean the query string so a refresh doesn't re-show it.
+  // clean the query string so a refresh doesn't re-show it. Can't read this in
+  // a useState initializer: `window.location` doesn't exist during the SSR
+  // pass this client component still goes through, so it has to be a one-time
+  // read on mount instead.
   useEffect(() => {
     const p = new URLSearchParams(window.location.search);
     const g = p.get('gcal');
     if (g === 'connected') {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time read of the OAuth-redirect query string on mount, not a render-cascade risk
       setGcalMsg({ ok: true, text: `Google Calendar connected${p.get('email') ? ' — ' + p.get('email') : ''}.` });
     } else if (g === 'error') {
       setGcalMsg({ ok: false, text: `Couldn't connect Google Calendar (${p.get('reason') || 'unknown'}). Please try again.` });

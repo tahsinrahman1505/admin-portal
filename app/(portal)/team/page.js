@@ -1,11 +1,11 @@
 'use client';
 import { useEffect, useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { resolveBotClientId } from '@/lib/clientId';
 
 // All doctor API calls go through server-side proxy routes (/api/rag/doctors/*)
 // so RAG_API_SECRET never touches the browser bundle.
 const PROXY_BASE = '/api/rag/doctors';
-const CLIENT_ID  = process.env.NEXT_PUBLIC_CLIENT_ID ?? 'dental_demo';
 
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 const inputCls = "w-full px-3 py-2.5 bg-white/[0.04] border border-white/[0.08] rounded-xl text-[13px] text-white placeholder-white/20 outline-none focus:border-[#00e5b0]/40 transition-all duration-200";
@@ -59,7 +59,7 @@ function DoctorCard({ doctor, onEdit, onManage, onDeactivate }) {
 }
 
 // ── Add / Edit Doctor modal ──────────────────────────────────────────────────
-function DoctorModal({ doctor, onSave, onClose }) {
+function DoctorModal({ doctor, clientId, onSave, onClose }) {
   const isEdit = !!doctor?.id;
   const [form, setForm] = useState({
     name:                doctor?.name || '',
@@ -75,12 +75,13 @@ function DoctorModal({ doctor, onSave, onClose }) {
 
   async function handleSave() {
     if (!form.name.trim()) { setErr('Doctor name is required.'); return; }
+    if (!clientId) { setErr('Still resolving your account — try again in a moment.'); return; }
     setSaving(true);
     setErr('');
     try {
-      const url    = isEdit ? `${PROXY_BASE}/${doctor.id}?client_id=${CLIENT_ID}` : PROXY_BASE;
+      const url    = isEdit ? `${PROXY_BASE}/${doctor.id}?client_id=${clientId}` : PROXY_BASE;
       const method = isEdit ? 'PUT' : 'POST';
-      const body   = isEdit ? form : { ...form, client_id: CLIENT_ID };
+      const body   = isEdit ? form : { ...form, client_id: clientId };
       const r = await fetch(url, { method, headers: headers(), body: JSON.stringify(body) });
       if (!r.ok) throw new Error(await r.text());
       onSave();
@@ -127,7 +128,7 @@ function DoctorModal({ doctor, onSave, onClose }) {
 }
 
 // ── Schedule + Leaves management panel ──────────────────────────────────────
-function ManagePanel({ doctor, onClose }) {
+function ManagePanel({ doctor, clientId, onClose }) {
   const [tab, setTab]         = useState('schedule');
   const [schedule, setSchedule] = useState([]);
   const [leaves, setLeaves]   = useState([]);
@@ -166,16 +167,21 @@ function ManagePanel({ doctor, onClose }) {
     } finally { setLoadingLv(false); }
   }, [doctor.id]);
 
-  useEffect(() => { loadSchedule(); loadLeaves(); }, [loadSchedule, loadLeaves]);
+  // Wrapped in an inline IIFE, same pattern as the channels page's `init()` —
+  // the effect body itself never calls setState synchronously, it just kicks
+  // both fetches off in parallel (unchanged from before: neither awaits the
+  // other).
+  useEffect(() => { (async () => { loadSchedule(); loadLeaves(); })() }, [loadSchedule, loadLeaves]);
 
   function setSchDay(i, k, v) {
     setSchedule(prev => prev.map((row, idx) => idx === i ? { ...row, [k]: v } : row));
   }
 
   async function saveSchedule() {
+    if (!clientId) { setMsg('Still resolving your account — try again in a moment.'); return; }
     setSaving(true); setMsg('');
     try {
-      const r = await fetch(`${PROXY_BASE}/${doctor.id}/schedule?client_id=${CLIENT_ID}`, {
+      const r = await fetch(`${PROXY_BASE}/${doctor.id}/schedule?client_id=${clientId}`, {
         method: 'PUT', headers: headers(), body: JSON.stringify(schedule),
       });
       if (!r.ok) throw new Error(await r.text());
@@ -186,15 +192,17 @@ function ManagePanel({ doctor, onClose }) {
   }
 
   async function deleteLeave(leaveId) {
-    await fetch(`${PROXY_BASE}/${doctor.id}/leaves/${leaveId}?client_id=${CLIENT_ID}`, { method: 'DELETE', headers: headers() });
+    if (!clientId) return;
+    await fetch(`${PROXY_BASE}/${doctor.id}/leaves/${leaveId}?client_id=${clientId}`, { method: 'DELETE', headers: headers() });
     loadLeaves();
   }
 
   async function submitLeave() {
     if (!leaveForm.leave_date) { setMsg('Please select a date.'); return; }
+    if (!clientId) { setMsg('Still resolving your account — try again in a moment.'); return; }
     setSaving(true);
     try {
-      const r = await fetch(`${PROXY_BASE}/${doctor.id}/leaves?client_id=${CLIENT_ID}`, {
+      const r = await fetch(`${PROXY_BASE}/${doctor.id}/leaves?client_id=${clientId}`, {
         method: 'POST', headers: headers(), body: JSON.stringify(leaveForm),
       });
       if (!r.ok) throw new Error(await r.text());
@@ -389,22 +397,34 @@ export default function TeamPage() {
   const [loading, setLoading]     = useState(true);
   const [editDoc, setEditDoc]     = useState(null);   // null=closed, {}=new, {...}=edit
   const [manageDoc, setManageDoc] = useState(null);
+  // Resolved from the logged-in user (multi-tenant), not a build-time env var.
+  const [clientId, setClientId]   = useState(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    resolveBotClientId().then(id => { if (!cancelled) setClientId(id); });
+    return () => { cancelled = true; };
+  }, []);
 
   const loadDoctors = useCallback(async () => {
+    if (!clientId) return; // don't fire until the tenant is resolved
     setLoading(true);
     try {
-      const r = await fetch(`${PROXY_BASE}?client_id=${CLIENT_ID}`, { headers: headers() });
+      const r = await fetch(`${PROXY_BASE}?client_id=${clientId}`, { headers: headers() });
       const d = await r.json();
       setDoctors(d.doctors || []);
     } catch { setDoctors([]); }
     finally { setLoading(false); }
-  }, []);
+  }, [clientId]);
 
-  useEffect(() => { loadDoctors(); }, [loadDoctors]);
+  // Wrapped in an inline IIFE, same pattern as the channels page's `init()` —
+  // keeps the effect body itself from calling setState synchronously.
+  useEffect(() => { (async () => { loadDoctors(); })() }, [loadDoctors]);
 
   async function handleDeactivate(id) {
     if (!confirm('Deactivate this doctor? They will no longer receive bookings.')) return;
-    await fetch(`${PROXY_BASE}/${id}?client_id=${CLIENT_ID}`, { method: 'DELETE', headers: headers() });
+    if (!clientId) return;
+    await fetch(`${PROXY_BASE}/${id}?client_id=${clientId}`, { method: 'DELETE', headers: headers() });
     loadDoctors();
   }
 
@@ -461,12 +481,12 @@ export default function TeamPage() {
 
       <AnimatePresence>
         {editDoc !== null && (
-          <DoctorModal doctor={editDoc?.id ? editDoc : null}
+          <DoctorModal doctor={editDoc?.id ? editDoc : null} clientId={clientId}
             onSave={() => { setEditDoc(null); loadDoctors(); }}
             onClose={() => setEditDoc(null)} />
         )}
         {manageDoc && (
-          <ManagePanel doctor={manageDoc} onClose={() => setManageDoc(null)} />
+          <ManagePanel doctor={manageDoc} clientId={clientId} onClose={() => setManageDoc(null)} />
         )}
       </AnimatePresence>
     </div>

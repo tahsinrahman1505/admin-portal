@@ -358,7 +358,7 @@ export default function ConversationsPage() {
       setLoading(false)
     }
     load()
-  }, [loadHandoffSessions])
+  }, [loadHandoffSessions, router])
 
   // ── Supabase Realtime ──
   useEffect(() => {
@@ -444,9 +444,20 @@ export default function ConversationsPage() {
   }, [portalClientId, botClientId, loadHandoffSessions])
 
   // ── Switch liveMessages when selected thread changes ──
+  // DELIBERATELY not restructured. `liveMessages` is also written by the realtime
+  // INSERT/UPDATE subscription above (via reconcileMessage, which de-duplicates an
+  // optimistic send against the echoed DB row). Moving this reset out of an effect
+  // changes the ordering between "thread switched" and "realtime row arrived", and
+  // getting that ordering wrong duplicates or drops messages in a live patient
+  // chat — a failure nobody would notice in review. This whole file is rewritten
+  // in Phase 1 of the portal restructure, where the reset becomes a `key` on the
+  // thread component and the effect disappears entirely. Suppressed until then
+  // rather than risking a subtle regression for a lint score.
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (selected) { setLiveMessages(selected.messages); setSummary(null) }
-  }, [selected?.session_id]) // eslint-disable-line
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selected?.session_id])
 
   // ── Load delivery receipts for the selected thread ──
   useEffect(() => {

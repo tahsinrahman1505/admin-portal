@@ -106,26 +106,16 @@ function useCountUp(target, inView, duration = 1200) {
   return target === 'N/A' ? 'N/A' : val
 }
 
-// D — Animated bar
-function AnimatedBar({ val, color, inView }) {
-  return (
-    <div className="flex-1 h-1.5 bg-white/[0.06] rounded-full overflow-hidden">
-      <motion.div
-        className="h-full rounded-full"
-        style={{ background: color }}
-        initial={{ width: 0 }}
-        animate={inView ? { width: `${val}%` } : { width: 0 }}
-        transition={{ duration: 0.9, delay: 0.2, ease: [0.16, 1, 0.3, 1] }}
-      />
-    </div>
-  )
-}
-
 // J — Onboarding checklist
 const CHECKLIST_KEY = 'tahsin_onboarding_dismissed'
 function OnboardingChecklist({ metrics, hasKnowledge }) {
   const [dismissed, setDismissed] = useState(true)
+  // Read the persisted dismissal once on mount (client-only — SSR has no localStorage).
+  // Defaulting the useState to `true` and flipping it here avoids a hydration
+  // mismatch: the server (and first client render) always renders "dismissed",
+  // then this one-time read on mount reveals the checklist if it was never dismissed.
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time read of a persisted value on mount, not a render-cascade risk
     setDismissed(!!localStorage.getItem(CHECKLIST_KEY))
   }, [])
   if (dismissed) return null
@@ -232,10 +222,7 @@ function MetricCard({ card, index, inView }) {
       <div className="text-[2.4rem] font-extrabold text-white leading-none mb-1.5 tabular-nums">
         {card.rawValue === 'N/A' ? 'N/A' : count}
       </div>
-      <div className="text-white/35 text-[12.5px] mb-3">{card.label}</div>
-      <span className="inline-flex items-center gap-1 text-[11px] font-medium text-[#00e5b0] bg-[#00e5b0]/10 rounded-full px-2.5 py-1">
-        ↑ {card.change} this week
-      </span>
+      <div className="text-white/35 text-[12.5px]">{card.label}</div>
     </motion.div>
   )
 }
@@ -304,7 +291,7 @@ export default function DashboardPage() {
       setLoading(false)
     }
     init()
-  }, [])
+  }, [router])
 
   if (loading) return <DashboardSkeleton />
 
@@ -318,28 +305,21 @@ export default function DashboardPage() {
   const iconCls = 'w-5 h-5'
   const cards = [
     {
-      label: 'Total Conversations', rawValue: metrics.totalConversations, change: '+12%',
+      label: 'Total Conversations', rawValue: metrics.totalConversations,
       icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.6} className={iconCls}><path strokeLinecap="round" strokeLinejoin="round" d="M20.25 8.511c.884.284 1.5 1.128 1.5 2.097v4.286c0 1.136-.847 2.1-1.98 2.193-.34.027-.68.052-1.02.072v3.091l-3-3c-1.354 0-2.694-.055-4.02-.163a2.115 2.115 0 01-.825-.242m9.345-8.334a2.126 2.126 0 00-.476-.095 48.64 48.64 0 00-8.048 0c-1.131.094-1.976 1.057-1.976 2.192v4.286c0 .837.46 1.58 1.155 1.951m9.345-8.334V6.637c0-1.621-1.152-3.026-2.76-3.235A48.455 48.455 0 0011.25 3c-2.115 0-4.198.137-6.24.402-1.608.209-2.76 1.614-2.76 3.235v6.226c0 1.621 1.152 3.026 2.76 3.235.577.075 1.157.14 1.74.194V21l4.155-4.155"/></svg>
     },
     {
-      label: 'Leads Captured', rawValue: metrics.leadsCount, change: '+8%',
+      label: 'Leads Captured', rawValue: metrics.leadsCount,
       icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.6} className={iconCls}><path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z"/></svg>
     },
     {
-      label: 'Appointments Booked', rawValue: metrics.appointmentsCount, change: '+5%',
+      label: 'Appointments Booked', rawValue: metrics.appointmentsCount,
       icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.6} className={iconCls}><path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5"/></svg>
     },
     {
-      label: 'Avg Rating', rawValue: metrics.avgRating, change: '+0.2',
+      label: 'Avg Rating', rawValue: metrics.avgRating,
       icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.6} className={iconCls}><path strokeLinecap="round" strokeLinejoin="round" d="M11.48 3.499a.562.562 0 011.04 0l2.125 5.111a.563.563 0 00.475.345l5.518.442c.499.04.701.663.321.988l-4.204 3.602a.563.563 0 00-.182.557l1.285 5.385a.562.562 0 01-.84.61l-4.725-2.885a.563.563 0 00-.586 0L6.982 20.54a.562.562 0 01-.84-.61l1.285-5.386a.562.562 0 00-.182-.557l-4.204-3.602a.563.563 0 01.321-.988l5.518-.442a.563.563 0 00.475-.345L11.48 3.5z"/></svg>
     },
-  ]
-
-  const scores = [
-    { label: 'Response Rate',         val: 94, color: '#00e5b0' },
-    { label: 'Lead Conversion',       val: 68, color: '#60a5fa' },
-    { label: 'Booking Rate',          val: 75, color: '#fbbf24' },
-    { label: 'Customer Satisfaction', val: 90, color: '#f472b6' },
   ]
 
   const activity = [
@@ -397,7 +377,7 @@ export default function DashboardPage() {
       />
 
       {/* Bottom panels */}
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 gap-4">
         {/* Activity */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -426,33 +406,13 @@ export default function DashboardPage() {
           </div>
         </motion.div>
 
-        {/* D — Animated performance bars */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={inView ? { opacity: 1, y: 0 } : {}}
-          transition={{ duration: 0.5, delay: 0.48, ease: [0.16, 1, 0.3, 1] }}
-          className="glass sheen lift rounded-[var(--r-md)] relative p-6"
-        >
-          <p className="text-[13px] font-semibold text-white/60 mb-5 flex items-center gap-2">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.7} className="w-4 h-4 text-[#00e5b0]"><path strokeLinecap="round" strokeLinejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z"/></svg>
-            Performance Score
-          </p>
-          <div className="space-y-4">
-            {scores.map((s, i) => (
-              <motion.div
-                key={s.label}
-                initial={{ opacity: 0 }}
-                animate={inView ? { opacity: 1 } : {}}
-                transition={{ duration: 0.3, delay: 0.55 + i * 0.08 }}
-                className="flex items-center gap-3"
-              >
-                <span className="text-[12.5px] text-white/40 w-44 shrink-0">{s.label}</span>
-                <AnimatedBar val={s.val} color={s.color} inView={inView} />
-                <span className="text-[12.5px] text-white/50 w-9 text-right tabular-nums shrink-0">{s.val}%</span>
-              </motion.div>
-            ))}
-          </div>
-        </motion.div>
+        {/*
+          Performance Score panel removed — it rendered fixed values
+          (Response Rate 94 / Lead Conversion 68 / Booking Rate 75 /
+          Customer Satisfaction 90) that were never computed from real data.
+          Bring it back once we have actual period-over-period metrics to
+          drive it.
+        */}
       </div>
 
       <p className="text-white/15 text-[11.5px] mt-6 flex items-center gap-1.5">

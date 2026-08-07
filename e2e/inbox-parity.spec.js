@@ -24,9 +24,15 @@ const INBOX = '/conversations'
  * bare <button> onto the ListRow primitive (role="option"), and a selector tied
  * to the tag would report "0 threads" for a perfectly healthy list — which is
  * exactly what happened the first time this suite ran against the new page.
+ *
+ * Scoped to the thread list's own listbox (`role="listbox"
+ * aria-label="Conversations"` in conversations/page.js) — an UNSCOPED
+ * getByRole('option') also matches a native <select>'s <option> elements, and
+ * Phase 2 added one (the assignee filter). That regressed this exact helper
+ * the moment it shipped; scoping is what makes "option" unambiguous again.
  */
 function threadRows(page) {
-  return page.getByRole('option')
+  return page.getByRole('listbox', { name: 'Conversations' }).getByRole('option')
 }
 
 test.describe('inbox parity', () => {

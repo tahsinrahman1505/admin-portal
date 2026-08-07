@@ -110,6 +110,103 @@
    borders stay mint and still look right on the light ground. */
 :root[data-theme="light"] [class*="text-[#00e5b0]"] { color: #00916e; }
 
+/* ═══════════════════════════════════════════════════════════════════════════
+   LAYOUT + SEMANTIC TOKENS — portal restructure, Phase 0
+
+   Purely ADDITIVE: nothing above this block is modified. Three groups.
+
+   1 · Pane + density metrics. The multi-pane inbox needs its column widths and
+       row heights tuned in ONE place; today every page invents its own
+       (w-72, w-[236px], py-3.5 …) and they don't line up with each other.
+
+   2 · Semantic status/priority colour. This is the group that actually
+       matters: triage colour is MEANING, not decoration — "urgent" has to read
+       as urgent in both themes. Pages currently reach for raw Tailwind
+       (text-amber-400, bg-red-500/10), which silently fails light mode because
+       a 400-weight amber on a near-white ground is unreadable. Every value
+       here is paired with a light-theme override picked for legibility on the
+       light ground, so a component written once is correct in both themes.
+
+   3 · Channel brand colour, previously hardcoded in conversations/page.js.
+       The brand hue is fixed by Meta/WhatsApp, but the true brand green and
+       blue FAIL contrast as text on white (#25D366 on #eef1f7 is ≈2.3:1,
+       well under the 4.5:1 floor). So light mode darkens the TEXT variant only
+       — dots, fills and borders keep the real brand colour, which is what
+       people actually recognise the channel by.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+:root,
+:root[data-theme="dark"] {
+  /* 1 · Pane metrics ------------------------------------------------------- */
+  --pane-rail:     236px;   /* existing sidebar rail — matches layout.js today */
+  --pane-folders:  188px;   /* inbox: channel / folder tree                    */
+  --pane-list:     340px;   /* inbox: thread list                              */
+  --pane-context:  312px;   /* inbox: patient context rail                     */
+  --pane-chat-min: 420px;   /* below this, the context rail collapses          */
+
+  /* Density — one scale so rows line up across inbox / leads / bookings */
+  --row-h-sm:  44px;
+  --row-h-md:  56px;
+  --row-h-lg:  76px;        /* thread row: 2 lines + metadata strip            */
+  --pane-pad:  14px;
+
+  /* 2 · Semantic — priority ------------------------------------------------ */
+  --prio-urgent:      #ff6b6b;
+  --prio-urgent-soft: rgba(255, 107, 107, 0.12);
+  --prio-high:        #fbbf24;
+  --prio-high-soft:   rgba(251, 191, 36, 0.12);
+  --prio-medium:      #60a5fa;
+  --prio-medium-soft: rgba(96, 165, 250, 0.12);
+  --prio-low:         rgba(238, 241, 246, 0.45);
+  --prio-low-soft:    rgba(238, 241, 246, 0.07);
+
+  /* Semantic — conversation status */
+  --status-open:          #00e5b0;
+  --status-open-soft:     rgba(0, 229, 176, 0.12);
+  --status-pending:       #fbbf24;
+  --status-pending-soft:  rgba(251, 191, 36, 0.12);
+  --status-resolved:      rgba(238, 241, 246, 0.45);
+  --status-resolved-soft: rgba(238, 241, 246, 0.07);
+
+  /* 3 · Channel brand ------------------------------------------------------ */
+  --ch-whatsapp:       #25D366;
+  --ch-whatsapp-text:  #25D366;
+  --ch-whatsapp-soft:  rgba(37, 211, 102, 0.12);
+  --ch-instagram:      #E1306C;
+  --ch-instagram-text: #E1306C;
+  --ch-instagram-soft: rgba(225, 48, 108, 0.12);
+  --ch-messenger:      #0084FF;
+  --ch-messenger-text: #0084FF;
+  --ch-messenger-soft: rgba(0, 132, 255, 0.12);
+}
+
+:root[data-theme="light"] {
+  /* Priority — darkened for legibility on the luminous ground */
+  --prio-urgent:      #dc2626;
+  --prio-urgent-soft: rgba(220, 38, 38, 0.10);
+  --prio-high:        #b45309;
+  --prio-high-soft:   rgba(180, 83, 9, 0.10);
+  --prio-medium:      #2563eb;
+  --prio-medium-soft: rgba(37, 99, 235, 0.10);
+  --prio-low:         rgba(16, 19, 23, 0.50);
+  --prio-low-soft:    rgba(16, 19, 23, 0.05);
+
+  --status-open:          #00916e;   /* same mint-on-light value as the override above */
+  --status-open-soft:     rgba(0, 145, 110, 0.10);
+  --status-pending:       #b45309;
+  --status-pending-soft:  rgba(180, 83, 9, 0.10);
+  --status-resolved:      rgba(16, 19, 23, 0.50);
+  --status-resolved-soft: rgba(16, 19, 23, 0.05);
+
+  /* Channel: true brand hue kept for dots/fills; TEXT variant darkened only. */
+  --ch-whatsapp-text:  #0f7a5f;
+  --ch-whatsapp-soft:  rgba(37, 211, 102, 0.14);
+  --ch-instagram-text: #b02455;
+  --ch-instagram-soft: rgba(225, 48, 108, 0.10);
+  --ch-messenger-text: #0068cc;
+  --ch-messenger-soft: rgba(0, 132, 255, 0.10);
+}
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);

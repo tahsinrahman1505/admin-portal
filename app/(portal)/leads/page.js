@@ -1,12 +1,13 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { createClient } from '@supabase/supabase-js';
+// Use the shared client from lib/supabase.js, never a local createClient().
+// The shared module is demo-aware: under NEXT_PUBLIC_DEMO_MODE it swaps in the
+// in-memory mock. Building a client here bypassed that entirely, so on the demo
+// deployment this page tried to reach the placeholder URL and died on a CSP
+// connect-src violation — the page rendered empty for every visitor. It also
+// created a second GoTrue client in the same tab, which supabase-js warns about.
+import { supabase } from '@/lib/supabase';
 import { TableSkeleton } from '@/components/Skeleton';
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-);
 
 const STATUS_STYLES = {
   New:    'bg-[#00e5b0]/10 text-[#00e5b0]',
@@ -19,13 +20,15 @@ export default function LeadsPage() {
   const [leads, setLeads] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => { fetchLeads(); }, []);
-
   async function fetchLeads() {
     const { data, error } = await supabase.from('leads').select('*').order('created_at', { ascending: false });
     if (!error) setLeads(data || []);
     setLoading(false);
   }
+
+  // Wrapped in an inline IIFE, same pattern as the channels page's `init()` —
+  // keeps the effect body itself from calling setState synchronously.
+  useEffect(() => { (async () => { await fetchLeads(); })(); }, []);
 
   async function updateStatus(id, newStatus) {
     setLeads(prev => prev.map(l => (l.id === id ? { ...l, status: newStatus } : l)));

@@ -127,7 +127,9 @@ export default function CopilotPage() {
     }
   }, [])
 
-  useEffect(() => { load() }, [load])
+  // Wrapped in an inline IIFE, same pattern as the channels page's `init()` —
+  // keeps the effect body itself from calling setState synchronously.
+  useEffect(() => { (async () => { await load() })() }, [load])
 
   const data = state.data
   const actions = (data?.actions || []).filter(a => !dismissed.has(`${a.type}:${a.ref}`))
@@ -146,7 +148,7 @@ export default function CopilotPage() {
             <h1 className="text-white font-bold text-[1.35rem] tracking-tight">Morning Huddle</h1>
           </div>
           <p className="text-white/40 text-[13px] mt-1">
-            {data?.clinic_name ? `${data.clinic_name} · ` : ''}Your copilot's read on what needs you today
+            {data?.clinic_name ? `${data.clinic_name} · ` : ''}Your copilot&apos;s read on what needs you today
           </p>
         </div>
         <button onClick={load} disabled={state.loading}
@@ -217,7 +219,7 @@ export default function CopilotPage() {
               initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }}
               className="text-center py-14 bg-white/[0.02] border border-white/[0.06] rounded-2xl">
               <div className="text-3xl mb-2">✅</div>
-              <p className="text-white/70 text-[15px] font-medium">You're all caught up</p>
+              <p className="text-white/70 text-[15px] font-medium">You&apos;re all caught up</p>
               <p className="text-white/35 text-[13px] mt-1">Nothing needs your attention right now.</p>
             </motion.div>
           )}

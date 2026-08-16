@@ -165,6 +165,24 @@ function ConnectionRow({ ch, waStatus, waBusy, onConnect, onDisconnect, socialSt
         </div>
       )
     }
+    // Instagram uses its OWN OAuth flow (Instagram Login), not Facebook Login
+    // for Business like Messenger does. Messaging on this app requires an
+    // Instagram USER token from that separate flow — the Facebook Page token
+    // Messenger connects with is rejected by graph.instagram.com outright. So
+    // this is a plain top-level navigation to /api/meta/instagram/start (the
+    // consent screen has to render in the address bar), not the JS SDK popup.
+    if (ch.key === 'instagram') {
+      return (
+        <a
+          href="/api/meta/instagram/start"
+          className="w-full mb-4 py-2.5 rounded-xl text-[12.5px] font-semibold transition-opacity flex items-center justify-center gap-2"
+          style={{ background: `${ch.color}18`, color: ch.color, border: `1px solid ${ch.color}30` }}
+        >
+          {`Connect ${ch.label}`}
+        </a>
+      )
+    }
+
     return (
       <button
         onClick={onConnectSocial}

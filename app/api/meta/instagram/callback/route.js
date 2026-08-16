@@ -94,11 +94,20 @@ export async function GET(request) {
     // switched Instagram between tenants on 2026-08-13. Better to block the
     // connect with a clear message than to create the ambiguity.
     const sb = createClient(SUPABASE_URL, SERVICE_KEY)
-    const { data: clash } = await sb
+    const { data: clash, error: clashErr } = await sb
       .from('client_configs')
       .select('client_id')
       .eq('ig_business_id', igBusinessId)
       .neq('client_id', botClientId)
+    // Fail CLOSED if the check itself failed. Discarding this error meant `data`
+    // came back null on any transient Supabase blip, the guard evaluated false,
+    // and we fell straight through to the write — silently recreating the
+    // two-clinics-one-Instagram-account ambiguity that flipped Instagram between
+    // tenants on 2026-08-13. A guard that only works when the database is
+    // healthy is not a guard.
+    if (clashErr) {
+      return back(request, { ig: 'error', reason: 'Could not verify account ownership, please try again' })
+    }
     if (clash && clash.length > 0) {
       return back(request, {
         ig: 'error',

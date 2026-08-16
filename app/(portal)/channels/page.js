@@ -509,6 +509,48 @@ export default function ChannelsPage() {
   const [socialError, setSocialError]     = useState(null)
   const waMsgListenerRef = useRef(null)
 
+  // Instagram OAuth callback outcome, read ONCE during the first render.
+  //
+  // /api/meta/instagram/callback is a top-level redirect, so the URL (?ig=…) is
+  // its only channel back. Nothing read those params, which meant every outcome
+  // was silent: a blocked phishing attempt, "that account belongs to another
+  // clinic", an expired session, and — worst — the longLived=false warning that
+  // says we are running on a token which dies within the hour. A page that
+  // looks fine while the connection is actually broken is exactly the failure
+  // this whole flow exists to eliminate; the UI must not reintroduce it.
+  //
+  // Lazy useState initializer rather than an effect, so the banner is DERIVED
+  // during render instead of set afterwards (no cascading re-render). Guarded
+  // for SSR because this client component is still server-rendered first.
+  const [igCallback] = useState(() => {
+    if (typeof window === 'undefined') return null
+    const p = new URLSearchParams(window.location.search)
+    const ig = p.get('ig')
+    if (!ig) return null
+    return { ig, reason: p.get('reason'), username: p.get('username'), longLived: p.get('longLived') }
+  })
+  const [igDismissed, setIgDismissed] = useState(false)
+
+  const igBanner = (() => {
+    if (!igCallback || igDismissed) return null
+    if (igCallback.ig === 'error') {
+      return { tone: 'error', text: igCallback.reason || 'Instagram connection failed.' }
+    }
+    if (igCallback.ig === 'cancelled') {
+      return { tone: 'error', text: 'Instagram connection was cancelled.' }
+    }
+    if (igCallback.ig === 'connected' && igCallback.longLived === 'false') {
+      // A warning, NOT a success: this token expires in ~1 hour, so replies
+      // would start failing silently if we showed a green tick here.
+      return {
+        tone: 'warning',
+        text: `Instagram connected${igCallback.username ? ` as @${igCallback.username}` : ''}, but only with a `
+          + 'short-lived token — it will stop working within the hour. Please disconnect and connect again.',
+      }
+    }
+    return null
+  })()
+
   const loadWaStatus = useCallback(async () => {
     try {
       const res = await fetch('/api/meta/whatsapp/status')
@@ -531,6 +573,18 @@ export default function ChannelsPage() {
       setSocialStatus({ messenger: { connected: false }, instagram: { connected: false } })
     }
   }, [])
+
+  // Tidy the URL after an OAuth callback. Deliberately does NOT refresh the
+  // connection status: the page has just mounted fresh from the redirect, and
+  // the init effect below already calls loadSocialStatus() on every mount, so a
+  // second call here would be a redundant fetch (and would set state from an
+  // effect for no reason). The banner itself is derived during render above.
+  useEffect(() => {
+    if (!igCallback) return
+    // Drop ?ig=… so a refresh doesn't replay a stale banner, and so the reason
+    // string isn't left sitting in the address bar / history.
+    window.history.replaceState({}, '', window.location.pathname)
+  }, [igCallback])
 
   const loadStats = useCallback(async (cid) => {
     const stats = { whatsapp: {}, instagram: {}, messenger: {} }
@@ -888,6 +942,26 @@ export default function ChannelsPage() {
           >
             <span>{socialError}</span>
             <button onClick={() => setSocialError(null)} className="text-red-300/50 hover:text-red-300 shrink-0">✕</button>
+          </motion.div>
+        )}
+        {igBanner && (
+          <motion.div
+            key="ig-callback-banner"
+            initial={{ opacity: 0, y: -8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.22 }}
+            className={`mb-4 flex items-center justify-between gap-2 px-4 py-3 rounded-xl text-[13px] font-medium ${
+              igBanner.tone === 'warning'
+                ? 'bg-amber-500/10 border border-amber-500/20 text-amber-300'
+                : 'bg-red-500/10 border border-red-500/20 text-red-300'
+            }`}
+          >
+            <span>{igBanner.text}</span>
+            <button
+              onClick={() => setIgDismissed(true)}
+              className={`shrink-0 ${igBanner.tone === 'warning' ? 'text-amber-300/50 hover:text-amber-300' : 'text-red-300/50 hover:text-red-300'}`}
+            >✕</button>
           </motion.div>
         )}
       </AnimatePresence>

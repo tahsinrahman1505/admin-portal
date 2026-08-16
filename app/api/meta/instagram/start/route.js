@@ -11,7 +11,10 @@
  */
 import { NextResponse } from 'next/server'
 import { getAuthedUser, unauthorized, forbidden } from '@/lib/auth'
-import { IG_APP_ID, IG_APP_SECRET, IG_SCOPES, igRedirectUri, signState } from '@/lib/igOauth'
+import {
+  IG_APP_ID, IG_APP_SECRET, IG_SCOPES, IG_NONCE_COOKIE,
+  igRedirectUri, signState, newNonce,
+} from '@/lib/igOauth'
 
 export async function GET(request) {
   const auth = await getAuthedUser(request)
@@ -25,16 +28,30 @@ export async function GET(request) {
     )
   }
 
+  // CSRF nonce: goes into the signed state AND into an httpOnly cookie on this
+  // browser. The callback requires both to agree, so a state lifted out of this
+  // redirect is useless in anyone else's browser. Same defence as
+  // app/api/google/start/route.js.
+  const nonce = newNonce()
+
   const url = new URL('https://www.instagram.com/oauth/authorize')
   url.searchParams.set('client_id', IG_APP_ID)
   url.searchParams.set('redirect_uri', igRedirectUri(request))
   url.searchParams.set('response_type', 'code')
   url.searchParams.set('scope', IG_SCOPES)
-  url.searchParams.set('state', signState(auth.botClientId))
+  url.searchParams.set('state', signState(auth.botClientId, nonce))
   // Forces the account chooser instead of silently reusing whatever Instagram
   // session the browser already has — a clinic owner logged into a personal
   // account would otherwise connect the wrong one without ever being asked.
   url.searchParams.set('force_reauth', 'true')
 
-  return NextResponse.redirect(url.toString())
+  const res = NextResponse.redirect(url.toString())
+  res.cookies.set(IG_NONCE_COOKIE, nonce, {
+    httpOnly: true,
+    secure: true,
+    sameSite: 'lax',  // must survive the top-level GET redirect back from instagram.com
+    path: '/',
+    maxAge: 600,      // matches the state TTL
+  })
+  return res
 }

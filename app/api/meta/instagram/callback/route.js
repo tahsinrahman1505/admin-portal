@@ -12,9 +12,10 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import {
-  IG_APP_ID, IG_APP_SECRET, igRedirectUri, verifyState,
+  IG_APP_ID, IG_APP_SECRET, IG_NONCE_COOKIE, igRedirectUri, verifyState, nonceMatches,
   exchangeCodeForToken, exchangeForLongLived, fetchIgIdentity,
 } from '@/lib/igOauth'
+import { getAuthedUser } from '@/lib/auth'
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL
 const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -23,7 +24,12 @@ function back(request, params) {
   const origin = process.env.NEXT_PUBLIC_SITE_URL || new URL(request.url).origin
   const url = new URL('/channels', origin)
   for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v)
-  return NextResponse.redirect(url.toString())
+  const res = NextResponse.redirect(url.toString())
+  // Always burn the nonce, on success AND on every failure path. It is
+  // single-use by design; leaving it alive would let a replayed callback reuse
+  // a still-valid browser binding.
+  res.cookies.set(IG_NONCE_COOKIE, '', { httpOnly: true, secure: true, sameSite: 'lax', path: '/', maxAge: 0 })
+  return res
 }
 
 export async function GET(request) {
@@ -44,11 +50,34 @@ export async function GET(request) {
     return back(request, { ig: 'error', reason: 'Instagram connect not configured' })
   }
 
-  // Tenant comes from the SIGNED state only. An unsigned/expired/tampered state
-  // is refused outright — otherwise a crafted callback could attach an attacker's
-  // Instagram account to someone else's clinic row.
-  const botClientId = verifyState(state)
-  if (!botClientId) return back(request, { ig: 'error', reason: 'Invalid or expired session, please try again' })
+  // ── Tenant binding, three independent checks ────────────────────────────────
+  // 1. SIGNED state: nobody can hand-craft a state naming another clinic.
+  const verified = verifyState(state)
+  if (!verified) return back(request, { ig: 'error', reason: 'Invalid or expired session, please try again' })
+  const { cid: botClientId, nonce: stateNonce } = verified
+
+  // 2. NONCE cookie: proves THIS browser is the one that started the flow.
+  //    Without it, a signature alone is insufficient — any clinic could lift
+  //    their own valid state out of /start's redirect, phish a victim clinic
+  //    owner with an authorize link carrying it, and have the victim's
+  //    Instagram token written onto the attacker's row (send DMs as the victim
+  //    clinic; receive the victim's inbound patient DMs). Signed-but-unbound
+  //    state was a real hole in the first version of this route.
+  const cookieNonce = request.cookies.get(IG_NONCE_COOKIE)?.value
+  if (!nonceMatches(cookieNonce, stateNonce)) {
+    return back(request, { ig: 'error', reason: 'Security check failed, please start the connection again' })
+  }
+
+  // 3. SESSION, when present: the logged-in clinic must be the one in the state.
+  //    Defence in depth — if a session cookie rides along (it normally does on a
+  //    same-site top-level redirect), a mismatch means something is wrong even
+  //    if 1 and 2 somehow passed. Absent session is tolerated rather than
+  //    fatal, because SameSite/browser behaviour on the return leg is not
+  //    guaranteed and 1+2 already bind the flow.
+  const auth = await getAuthedUser(request).catch(() => null)
+  if (auth?.botClientId && auth.botClientId !== botClientId) {
+    return back(request, { ig: 'error', reason: 'Session does not match this connection request' })
+  }
 
   try {
     const { token: shortToken } = await exchangeCodeForToken(code, igRedirectUri(request))

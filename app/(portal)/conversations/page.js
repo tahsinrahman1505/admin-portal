@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback, useRef, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { ConversationsSkeleton } from '@/components/Skeleton'
-import { EmptyState, StatusBadge, SegmentedTabs } from '@/components/ui'
+import { EmptyState, StatusBadge, SegmentedTabs, Drawer } from '@/components/ui'
 import { FolderRail, ThreadRow, MessageBubble, Composer, PatientContext } from '@/components/inbox'
 
 const API_URL     = '/api/rag'
@@ -80,6 +80,11 @@ export default function ConversationsPage() {
   const [summaries, setSummaries]       = useState({})
   const [summarizing, setSummarizing]   = useState(false)
   const [suggesting, setSuggesting]     = useState(false)
+
+  // Patient context is a fixed pane at 2xl+ and a Drawer below it (see the
+  // render below) — this only controls the drawer; the fixed pane needs no
+  // open/close state since it's always visible at that width.
+  const [contextOpen, setContextOpen]   = useState(false)
 
   const [liveMessages, setLiveMessages] = useState([])
   const [deliveries, setDeliveries]     = useState([]) // message_delivery rows for selected thread
@@ -773,6 +778,23 @@ export default function ConversationsPage() {
                 </p>
               </div>
               <div className="flex items-center gap-2 shrink-0">
+                {/* Patient context is a fixed pane at 2xl+ (below, unchanged) —
+                    below that width it's hidden entirely, so this is the only
+                    way to reach patient identity, AI summary, and every triage
+                    control (status/priority/assignee/tags). Hidden at 2xl+
+                    since the fixed pane already shows all of that there. */}
+                <button
+                  type="button"
+                  onClick={() => setContextOpen(true)}
+                  aria-label="Patient info"
+                  title="Patient info"
+                  className="2xl:hidden w-8 h-8 rounded-lg flex items-center justify-center text-[var(--ink-3)]
+                             hover:text-[var(--ink-1)] hover:bg-white/[0.06] transition-colors"
+                >
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.7} className="w-[18px] h-[18px]">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
+                  </svg>
+                </button>
                 <StatusBadge status={statusToken(selectedStatus)} />
                 {selectedHandedOff ? (
                   <button
@@ -841,29 +863,41 @@ export default function ConversationsPage() {
         )}
       </div>
 
-      {/* Patient context — hidden below 2xl so the chat keeps a readable width */}
-      <div className="hidden 2xl:block shrink-0" style={{ width: 'var(--pane-context)' }}>
-        <PatientContext
-          thread={selected}
-          messageCount={liveMessages.length}
-          summary={summary}
-          summarizing={summarizing}
-          onSummarize={handleSummarize}
-          onDismissSummary={dismissSummary}
-          triageStatus={selectedMeta?.triageStatus}
-          priority={selectedMeta?.priority}
-          assigneeId={selectedMeta?.assigneeId}
-          tags={selectedMeta?.tags}
-          staff={staffList}
-          tagCatalogue={tagCatalogue}
-          onSetTriageStatus={setThreadTriageStatus}
-          onSetPriority={setThreadPriority}
-          onSetAssignee={setThreadAssignee}
-          onAddTag={addThreadTag}
-          onRemoveTag={removeThreadTag}
-          onCreateTag={createTag}
-        />
-      </div>
+      {/* Patient context — a fixed pane at 2xl+, and (same props, same live
+          state) a Drawer below that width, opened by the header button above.
+          One props object so the two renders can't drift out of sync. */}
+      {(() => {
+        const contextProps = {
+          thread: selected,
+          messageCount: liveMessages.length,
+          summary,
+          summarizing,
+          onSummarize: handleSummarize,
+          onDismissSummary: dismissSummary,
+          triageStatus: selectedMeta?.triageStatus,
+          priority: selectedMeta?.priority,
+          assigneeId: selectedMeta?.assigneeId,
+          tags: selectedMeta?.tags,
+          staff: staffList,
+          tagCatalogue,
+          onSetTriageStatus: setThreadTriageStatus,
+          onSetPriority: setThreadPriority,
+          onSetAssignee: setThreadAssignee,
+          onAddTag: addThreadTag,
+          onRemoveTag: removeThreadTag,
+          onCreateTag: createTag,
+        }
+        return (
+          <>
+            <div className="hidden 2xl:block shrink-0" style={{ width: 'var(--pane-context)' }}>
+              <PatientContext {...contextProps} />
+            </div>
+            <Drawer open={contextOpen} onClose={() => setContextOpen(false)} label="Patient context">
+              <PatientContext {...contextProps} onClose={() => setContextOpen(false)} />
+            </Drawer>
+          </>
+        )
+      })()}
     </div>
   )
 }

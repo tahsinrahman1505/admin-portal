@@ -120,12 +120,16 @@ test.describe('triage — assignee filter', () => {
   })
 })
 
-test.describe('triage — patient context panel', () => {
-  // The context rail (Priority/Assigned to/Tags) is deliberately hidden below
-  // the 2xl breakpoint so the chat pane keeps a readable width — see
-  // conversations/page.js's `hidden 2xl:block` wrapper. Playwright's default
-  // 1280px viewport is below that, so every test in this block needs the
-  // wider viewport the screenshot spec already uses for the same reason.
+test.describe('triage — patient context panel (fixed pane, 2xl+)', () => {
+  // The FIXED context pane (as opposed to its Drawer substitute below 2xl —
+  // see e2e/context-drawer.spec.js) only renders at the 2xl breakpoint+, so
+  // the chat pane keeps a readable width there — see conversations/page.js's
+  // `hidden 2xl:block` wrapper. Playwright's default 1280px viewport is below
+  // that, so every test in this block needs the wider viewport the
+  // screenshot spec already uses for the same reason. Below 2xl, this exact
+  // Triage section is reachable via the header's "Patient info" button
+  // instead — same PatientContext component, same triage logic, different
+  // chrome (Drawer vs fixed pane).
   test.use({ viewport: { width: 1680, height: 950 } })
 
   test('selecting a thread shows a Triage section with priority, assignee and tags', async ({ page }) => {

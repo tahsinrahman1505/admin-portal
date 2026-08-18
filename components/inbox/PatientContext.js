@@ -33,10 +33,14 @@ export default function PatientContext({
   // them in (matches how `summary` etc. above already degrade gracefully).
   triageStatus, priority, assigneeId, tags, staff, tagCatalogue,
   onSetTriageStatus, onSetPriority, onSetAssignee, onAddTag, onRemoveTag, onCreateTag,
+  // Optional close affordance — set by a caller rendering this inside a Drawer
+  // (the <2xl substitute for the fixed context pane); the fixed-pane caller
+  // omits it, so ContextPanel renders with no close button there, unchanged.
+  onClose,
 }) {
   if (!thread) {
     return (
-      <ContextPanel title="Patient Context">
+      <ContextPanel title="Patient Context" onClose={onClose}>
         <EmptyState
           title="No conversation selected"
           description="Pick a conversation from the list to see patient context here."
@@ -51,7 +55,7 @@ export default function PatientContext({
   const firstSeen = thread.messages?.[0]?.created_at
 
   return (
-    <ContextPanel title="Patient Context">
+    <ContextPanel title="Patient Context" onClose={onClose}>
       <ContextSection label="Identity">
         <div className="flex items-center gap-3 mb-2.5">
           <Avatar name={displayName} channel={channel} size={56} />

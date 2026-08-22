@@ -19,21 +19,40 @@ const STATUS_STYLES = {
 export default function LeadsPage() {
   const [leads, setLeads] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [clientId, setClientId] = useState(null);
 
-  async function fetchLeads() {
-    const { data, error } = await supabase.from('leads').select('*').order('created_at', { ascending: false });
+  // Resolve the caller's own clients.id the same way dashboard/page.js does —
+  // this page previously queried `leads` with no client_id filter at all
+  // (fix 2026-08-22), which let any logged-in clinic user read (and, via
+  // updateStatus, edit) every other clinic's leads.
+  async function resolveClientId() {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return null;
+    const { data: clientRow } = await supabase.from('clients').select('id').eq('user_id', user.id).single();
+    return clientRow?.id ?? null;
+  }
+
+  async function fetchLeads(id) {
+    const { data, error } = await supabase.from('leads').select('*').eq('client_id', id).order('created_at', { ascending: false });
     if (!error) setLeads(data || []);
     setLoading(false);
   }
 
   // Wrapped in an inline IIFE, same pattern as the channels page's `init()` —
   // keeps the effect body itself from calling setState synchronously.
-  useEffect(() => { (async () => { await fetchLeads(); })(); }, []);
+  useEffect(() => {
+    (async () => {
+      const id = await resolveClientId();
+      setClientId(id);
+      if (id) await fetchLeads(id);
+      else setLoading(false);
+    })();
+  }, []);
 
   async function updateStatus(id, newStatus) {
     setLeads(prev => prev.map(l => (l.id === id ? { ...l, status: newStatus } : l)));
-    const { error } = await supabase.from('leads').update({ status: newStatus }).eq('id', id);
-    if (error) { console.error(error); fetchLeads(); }
+    const { error } = await supabase.from('leads').update({ status: newStatus }).eq('id', id).eq('client_id', clientId);
+    if (error) { console.error(error); fetchLeads(clientId); }
   }
 
   function exportCSV() {

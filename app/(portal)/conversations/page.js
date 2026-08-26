@@ -131,11 +131,24 @@ export default function ConversationsPage() {
       setBotClientId(botCid)
       setPortalClientId(clientRow.id)
 
-      const { data: rows } = await supabase
+      // Fetch DESC + limit, then reverse to ascending (fix 2026-08-25): this used
+      // to fetch ascending with NO limit at all, relying on PostgREST's implicit
+      // default row cap (1000). That cap silently truncated the query from the
+      // OLDEST end — so once this clinic passed 1000 rows (it's now at 1068),
+      // every page load quietly dropped the newest ~68 rows, including every
+      // conversation from today. Ordering DESC with an explicit limit guarantees
+      // the most recent messages are always included no matter how large the
+      // table grows; only very old history can fall outside the window, which is
+      // the right tradeoff for an inbox. buildThreads() requires ascending order
+      // (it reads messages[0] as oldest and messages[length-1] as newest per
+      // thread), hence the .reverse() below.
+      const { data: rowsDesc } = await supabase
         .from('conversations')
         .select('*')
         .eq('client_id', clientRow.id)
-        .order('created_at', { ascending: true })
+        .order('created_at', { ascending: false })
+        .limit(5000)
+      const rows = rowsDesc ? [...rowsDesc].reverse() : rowsDesc
 
       if (!rows) { setLoading(false); return }
 

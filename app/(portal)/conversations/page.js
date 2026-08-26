@@ -214,7 +214,14 @@ export default function ConversationsPage() {
               ...pickIdentity([newRow]),
               messages:     [newRow],
             }
-            return [newThread, ...prev]
+            // Sort here too (fix 2026-08-26) — the existing-thread branch below
+            // already re-sorts by byLastActive after an update, but this
+            // brand-new-thread branch just prepended without sorting. Prepending
+            // happens to match a sorted position in the common case (a message
+            // that just arrived usually IS the newest), but it's not guaranteed —
+            // e.g. if realtime events for two different new threads arrive out of
+            // send order. Sorting here makes both branches equally reliable.
+            return [newThread, ...prev].sort(byLastActive)
           }
           const updated = [...prev]
           const mergedMessages = reconcileMessage(updated[idx].messages, newRow)
